@@ -36,7 +36,18 @@ impl AppState {
     }
 
     /// Persist new settings, sanitise them and refresh the in-memory copy.
+    ///
+    /// Every save funnels through here, including partial patches such as the
+    /// companion position, so the loopback check on `ollama_url` cannot be
+    /// side-stepped by taking the patch route.
     pub fn replace_settings(&self, incoming: Settings) -> WolfResult<Settings> {
+        // Sanitise first so a blank URL still falls back to the default, then
+        // reject anything that is not loopback before it can reach SQLite.
+        let incoming = incoming.sanitized();
+        let incoming = Settings {
+            ollama_url: crate::ollama::validate_base_url(&incoming.ollama_url)?,
+            ..incoming
+        };
         let saved = self.db.save_settings(&incoming)?;
         let mut guard = self
             .settings
