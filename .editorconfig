@@ -1,0 +1,36 @@
+# EditorConfig, so a contributor's editor matches the repository.
+# https://editorconfig.org
+#
+# Wolf's existing style is two spaces, LF, and a trailing newline. The Rust side
+# is formatted by `cargo fmt`, which owns .rs: the settings below match it rather
+# than competing with it, so `npm run rust:fmt` stays a no-op on a clean tree.
+#
+# Nothing here is enforced by CI. See CONTRIBUTING.md.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.rs]
+indent_size = 4
+max_line_length = 100
+
+[*.{json,jsonc,yml,yaml,toml}]
+indent_size = 2
+
+[*.md]
+# Two trailing spaces are a line break in Markdown, so they are not trimmed.
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab
+
+[*.{png,ico,jpg,jpeg,gif,webp,woff,woff2,ttf,sqlite,sqlite3}]
+insert_final_newline = unset
+trim_trailing_whitespace = unset
