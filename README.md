@@ -1,149 +1,156 @@
 # Wolf
 
-A local-first productivity companion for the Linux desktop. Tasks, habits, calendar, a
-focus timer, and a small pixel wolf who reacts to what you are doing. All data stays in a
-local SQLite file. The optional assistant runs against `ollama` on your own machine.
+A pixel-art productivity companion that lives on your desktop. Tasks, habits,
+calendar, a focus timer, and a local AI assistant — with a wolf that reacts to
+what you are doing.
 
-Tauri 2 + React + TypeScript in the shell, Rust and SQLite underneath, no cloud, no
-accounts, no telemetry, no network calls except to localhost.
+Everything is stored in a SQLite database on your own machine. The only thing
+that ever leaves it is a question you ask the assistant, and that goes to an
+Ollama daemon you run yourself on localhost.
 
+## What it does
 
+**Tasks** — capture, prioritise, and filter by day, project or status. Tasks
+without a due date are not lost, they just sort last.
 
+**Habits** — daily, weekday, or weekly frequencies, with current and longest
+streaks and a 28-day completion grid. Undoing a day recalculates the streak
+correctly rather than pretending it never happened.
 
-## Features
+**Calendar** — events with reminders, and month and day views. The reminder is
+delivered through your desktop's notification service at a lead time you set per
+event.
 
-- **Tasks**  inbox/doing/done columns, priorities 1-4, due dates, descriptions,
-  keyboard-first quick add.
-- **Habits**  daily/weekly/monthly targets, completion history, current and best
-  streaks.
-- **Calendar**  month grid plus day detail, timed events, optional per-event reminders.
-- **Focus**  Pomodoro state machine with focus/short/long phases, pause, skip, and
-  session history with daily totals.
-- **Assistant**  streams answers from a local Ollama model, with the relevant parts of
-  your own data injected as context so you can ask "what's overdue?" or "how are my
-  habits?" without leaving the app.
-- **Companion**  a transparent, always-on-top, draggable pixel window whose pose
-  reflects what the app is doing. Built from a hand-authored 28x28 sprite matrix.
-- **Desktop integration**  system tray with real actions, close-to-tray, notifications
-  for task reminders and finished focus sessions, keyboard shortcuts `1`-`7` to switch
-  screens.
+**Focus** — a Pomodoro-style timer with configurable block and break lengths.
+Each completed session is recorded, and the sparkline shows the last seven days
+of minutes. Days are grouped by _your local midnight_, not by UTC, so a session
+that ends just after midnight lands on the right day.
 
+**Assistant** — ask a question in plain language. Wolf classifies the intent and
+assembles a block of your own tasks, habits, events, and focus history, then
+sends that with your question to a local Ollama model. It answers about your
+week rather than in general.
 
+**The wolf** — nine poses, 32 frames, all generated from a single 28x28
+character matrix. It sits in its own transparent window, so it floats over
+whatever you are doing, and you can scale, rename, reposition and pin it. It
+blinks while you listen, talks while it thinks, and looks sad when Ollama is down.
 
+## Screenshots
 
+The interface is a single dark palette with no rounded corners, because the
+palette and the shape language are both taken from the wolf's own eight colours:
+the sprite's fur is the interface's outline, its cream is the interface's text,
+and its pink cheek is the interface's accent.
 
-## Requirements
+<!-- Screenshots to be added here. -->
 
-- Arch Linux (or a derivative) — `bash scripts/setup-arch.sh` installs everything
-- Node.js 20+ and Rust (via `rustup`)
-- WebKitGTK 4.1, GTK 3, OpenSSL, libsoup 3
-- Optionally `ollama` for the assistant; without it every other feature still works
+## Install
 
-Verify your system without installing anything:
+Linux, for now. The app is a Tauri build, so it is native rather than a web page
+in a wrapper.
 
 ```bash
-bash scripts/check-dependencies.sh
-```
-
-## Getting started
-
-```bash
+git clone https://github.com/ArthurJosephLawson/Wolf.git
+cd Wolf
 npm install
 npm run dev
 ```
 
-`npm run dev` starts the Vite dev server and launches the Tauri shell. You want that
-one — plain `npm run dev:web` opens in your browser where the native layer is absent and
-the UI shows a "desktop unavailable" notice.
+To build installers (`.deb` and AppImage):
 
-First launch, if you do not have a model: `ollama pull llama3.2`. The Assistant page
-lists the models it can see and lets you pick the default.
-
-## Commands
-
-| Command               | What it does                                                                  |
-| --------------------- | ----------------------------------------------------------------------------- |
-| `npm run dev`         | Dev server + Tauri window (the normal way to work on Wolf)                    |
-| `npm run dev:web`     | Vite only, in a browser. No tray, no companion, no SQLite                     |
-| `npm run build`       | Production bundle: `.deb` and AppImage into `src-tauri/target/release/bundle` |
-| `npm run build:web`   | Typecheck and bundle the frontend only, no Rust                               |
-| `npm run typecheck`   | `tsc --noEmit`                                                                |
-| `npm run lint`        | ESLint, zero warnings tolerated                                               |
-| `npm run test`        | Vitest unit tests                                                             |
-| `npm run rust:check`  | `cargo check`                                                                 |
-| `npm run rust:test`   | `cargo test`                                                                  |
-| `npm run rust:clippy` | `cargo clippy --all-targets -- -D warnings`                                   |
-| `npm run verify`      | Typecheck, lint, unit tests, cargo check, cargo test                          |
-| `npm run check:deps`  | Report missing system packages                                                |
-
-## Where your data lives
-
-```
-$XDG_CONFIG_HOME/wolf/wolf.db     # or ~/.config/wolf/wolf.db
+```bash
+npm run build
 ```
 
-Plain SQLite. Back it up by copying that one file while Wolf is closed. Schema
-migrations are embedded in the binary and applied in order on startup, so there is no
-separate migration step.
+These land in `src-tauri/target/release/bundle/`. There is no download yet for
+v0.1.0 — the tag marks the release, and building from source is the current way
+to install it.
+
+### Requirements
+
+- Node 20 or newer
+- A Rust toolchain from 1.82
+- On Debian or Ubuntu, Tauri's system libraries:
+
+  ```bash
+  sudo apt install libwebkit2gtk-4.1-dev build-essential curl \
+    wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev \
+    patchelf
+  ```
+
+The Tauri dependencies are listed in full in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## The assistant
+
+The assistant is optional. Wolf works fully without it, and the assistant screen
+tells you plainly when the daemon is not running.
+
+To enable it:
+
+1. Install [Ollama](https://ollama.com).
+2. Start it with `ollama serve`.
+3. Pull a small model — `qwen2.5-coder` is what Wolf suggests, but any model
+   Ollama has will do:
+
+   ```bash
+   ollama pull qwen2.5-coder
+   ```
+
+4. Open **Settings**, and check the daemon status. If it says ready, you are done.
+
+### Why Wolf refuses other addresses
+
+Wolf's base URL is validated when you save it, and only `http://localhost` and
+`http://127.0.0.1` are accepted. This is not caution about ports; it is the whole
+privacy model. A remote URL would receive your tasks, habits, calendar and focus
+history, embedded in every question. Wolf would be silently doing the one thing
+it promises it will not do.
+
+If you point it at a remote host, the setting is rejected rather than stored.
 
 ## Privacy
 
-Wolf has no network code paths except the Ollama client, which refuses to talk to
-anything but `http://localhost:11434` or `http://127.0.0.1:11434`. The CSP in
-`src-tauri/tauri.conf.json` blocks remote script, style, and connection targets. There
-are no analytics, no crash reporting, and no update check. Uninstalling is deleting the
-app; your data stays in that file until you remove it.
+- Your data is in a SQLite file in your platform's user data directory. Wolf has
+  no account, no sync, and no telemetry, and it makes no network requests other
+  than to the Ollama daemon you configure.
+- That daemon must be on loopback. A non-loopback address is refused on save.
+- If you do use the assistant, your tasks, habits, events and focus history are
+  included in the prompt sent to your local model. That is the feature working.
+  It stays on your machine, but it is worth knowing that the prompt contains it.
+
+## Development
+
+```bash
+npm run verify       # typecheck, lint, vitest, cargo check, cargo test
+npm run dev:web      # frontend only, in a browser, against a stubbed bridge
+npm run test         # 114 frontend tests
+npm run rust:test    # 81 Rust tests
+```
+
+Neither suite needs a display, a running Ollama daemon, or a database file. The
+Rust tests run the real migrations against in-memory SQLite.
+
+There is a test that parses the frontend's `invoke` calls and the Rust
+command list and fails if the two disagree on a command name or an argument key.
+Tauri resolves both at runtime, so without it a renamed command is a
+production-only failure.
+
+Before opening a pull request, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Architecture
 
-```
-src/                 React frontend
-  pages/             one module per screen
-  stores/            Zustand stores, one per domain, singletons
-  services/          the only code that talks to Tauri or Ollama
-  components/        shared UI, grouped by feature
-  assets/wolf/       sprite matrix + transforms (no image files)
-src-tauri/src/
-  commands/          thin Tauri command adapters, no business logic
-  models/            domain types and validation
-  database/          migrations and the SQLite repositories
-  ai/                intent classification and context building
-  ollama/            localhost streaming client
-  tray/, windows/    desktop shell integration
-  state.rs           managed state, settings patch application
-```
+A React and TypeScript frontend over a Rust backend, with SQLite in between. The
+frontend never calls Tauri directly; it goes through a service layer, which is
+what makes the IPC contract testable.
 
-The dependency direction is one-way: `components/pages -> stores -> services -> Tauri`.
-Rust mirrors that with `commands -> database/models`, and `ai` depends only on
-`database`, never on commands. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for why.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how the pieces fit together.
+- [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) — where new code should go.
 
-## Development notes
+## About
 
-- The wolf sprite is generated from a typed pixel matrix in `src/assets/wolf/wolf-pixels.json`
-  and transformed at runtime into SVG runs, so recolouring is a data change rather than
-  an image edit. `node scripts/generate-icons.mjs` regenerates the PNG app and tray icons
-  from that same matrix.
-- Timer behaviour lives in `src/utils/timerLogic.ts` as a pure function so it can be
-  tested without React or a clock. The same rule applies to task and date helpers.
-- Two windows means two entrypoints, `src/main.tsx` and `src/companion.tsx`, built from
-  `index.html` and `companion.html`.
+Wolf was built with heavy assistance from AI coding tools (OpenCode). The design, testing, and direction are maintained by the project owner.
 
-## Troubleshooting
-
-**The tray icon is missing.** The tray needs a StatusNotifier host, which GNOME does not
-provide by default and Wayland sessions do not always have. Use the X11 session, or
-install `libappindicator-gtk3`, or just launch from the app window.
-
-**Build fails on `webkit2gtk-4.1`.** That package name is the Tauri v2 requirement. If
-you only have `webkit2gtk-4.0`, remove it and install `webkit2gtk-4.1`.
-
-**The assistant says Ollama is offline.** Check `curl http://localhost:11434/api/tags`.
-If that fails, start `ollama serve`. The app intentionally does not start a daemon for
-you.
-
-**The companion window disappeared.** Tray → Show companion. Its position is saved when
-you drag it.
-
-## License
+## Licence
 
 MIT. See [LICENSE](LICENSE).
