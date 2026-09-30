@@ -240,14 +240,39 @@ mod tests {
     use super::*;
     use crate::database::test_support::test_db;
 
-    fn session(start: &str, minutes: u32) -> NewFocusSession {
+    /// A completed session starting at a given **local** wall-clock time.
+    ///
+    /// Sessions are stored as UTC instants but bucketed by local day, so the
+    /// tests have to describe a local time and let the helper do the
+    /// conversion. Writing `T09:00:00.000Z` directly would only agree with the
+    /// local day when the test machine happens to run in UTC.
+    fn local_session(date: &str, hour: u32, minute: u32, minutes: u32) -> NewFocusSession {
+        let day = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").expect("valid date");
+        let started = day
+            .and_hms_opt(hour, minute, 0)
+            .expect("valid time")
+            .and_local_timezone(chrono::Local)
+            .earliest()
+            .unwrap_or_else(|| {
+                panic!("{date} {hour}:{minute} does not exist in the local timezone")
+            });
+        let ended = started + chrono::Duration::minutes(minutes as i64);
+        let stamp = |t: chrono::DateTime<chrono::Local>| {
+            t.with_timezone(&chrono::Utc)
+                .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+        };
         NewFocusSession {
-            started_at: format!("{start}T09:00:00.000Z"),
-            ended_at: Some(format!("{start}T09:{:02}:00.000Z", 30)),
+            started_at: stamp(started),
+            ended_at: Some(stamp(ended)),
             duration_seconds: Some(minutes * 60),
             completed: Some(true),
             kind: Some(FocusSessionKind::Focus),
         }
+    }
+
+    /// Mid-morning on the given local day.
+    fn session(start: &str, minutes: u32) -> NewFocusSession {
+        local_session(start, 9, 0, minutes)
     }
 
     #[test]
@@ -331,5 +356,67 @@ mod tests {
         );
         assert_eq!(stats.daily_minutes[0].minutes, 25);
         assert_eq!(stats.daily_minutes[6].minutes, 0);
+    }
+
+    #[test]
+    fn sessions_straddling_local_midnight_stay_in_their_own_day() {
+        // The regression this guards: a session at 23:30 on one local day and
+        // one at 00:30 on the next both land on the *UTC* day before or after
+        // for most timezones, which is what the old substr comparison used.
+        let db = test_db();
+        db.create_focus_session(&local_session("2026-09-27", 23, 30, 25)).unwrap();
+        db.create_focus_session(&local_session("2026-09-28", 0, 30, 50)).unwrap();
+
+        let stats = db.focus_stats("2026-09-28", "2026-09-22").expect("stats");
+        let minutes = |day: &str| {
+            stats
+                .daily_minutes
+                .iter()
+                .find(|d| d.date == day)
+                .map(|d| d.minutes)
+                .unwrap_or(u32::MAX)
+        };
+
+        assert_eq!(minutes("2026-09-27"), 25, "late session belongs to the 27th");
+        assert_eq!(minutes("2026-09-28"), 50, "early session belongs to the 28th");
+        assert_eq!(stats.focus_minutes_today, 50);
+        assert_eq!(stats.completed_today, 1);
+        assert_eq!(stats.focus_minutes_week, 75);
+    }
+
+    #[test]
+    fn a_session_exactly_at_local_midnight_belongs_to_the_new_day() {
+        let db = test_db();
+        db.create_focus_session(&local_session("2026-09-28", 0, 0, 25)).unwrap();
+        db.create_focus_session(&local_session("2026-09-27", 23, 59, 25)).unwrap();
+
+        let stats = db.focus_stats("2026-09-28", "2026-09-22").expect("stats");
+        let minutes = |day: &str| {
+            stats
+                .daily_minutes
+                .iter()
+                .find(|d| d.date == day)
+                .map(|d| d.minutes)
+                .unwrap_or(u32::MAX)
+        };
+
+        assert_eq!(minutes("2026-09-28"), 25, "midnight starts the new day");
+        assert_eq!(minutes("2026-09-27"), 25);
+    }
+
+    #[test]
+    fn day_bounds_are_ordered_and_contiguous() {
+        // A day window must start exactly where the previous one ended, or
+        // sessions are double counted or dropped.
+        let first = parse_local_day("2026-09-22").unwrap();
+        let mut previous = local_day_start(first).unwrap();
+        for offset in 0..7 {
+            let date = first + chrono::Duration::days(offset);
+            let start = local_day_start(date).unwrap();
+            let end = local_day_start(date + chrono::Duration::days(1)).unwrap();
+            assert_eq!(start, previous, "window for {date} is not contiguous");
+            assert!(start < end, "window for {date} is not ordered");
+            previous = end;
+        }
     }
 }
