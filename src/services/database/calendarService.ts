@@ -1,0 +1,52 @@
+import { invoke } from "../desktop/bridge";
+import type {
+  CalendarEvent,
+  CalendarEventUpdate,
+  CalendarOverview,
+  DaySummary,
+  NewCalendarEvent,
+} from "../../types";
+
+export const calendarService = {
+  list(range: { from?: string; to?: string }): Promise<CalendarEvent[]> {
+    return invoke<CalendarEvent[]>("list_events", { query: range });
+  },
+
+  upcoming(limit = 5): Promise<CalendarEvent[]> {
+    return invoke<CalendarEvent[]>("upcoming_events", { limit });
+  },
+
+  create(event: NewCalendarEvent): Promise<CalendarEvent> {
+    return invoke<CalendarEvent>("create_event", { event });
+  },
+
+  update(id: string, update: CalendarEventUpdate): Promise<CalendarEvent> {
+    return invoke<CalendarEvent>("update_event", { id, update });
+  },
+
+  remove(id: string): Promise<void> {
+    return invoke<void>("delete_event", { id });
+  },
+
+  /** Day-by-day rollup for a whole month, padded to full weeks. */
+  monthSummaries(year: number, month: number): Promise<DaySummary[]> {
+    return invoke<DaySummary[]>("month_summaries", { year, month });
+  },
+
+  eventsForDay(date: string): Promise<CalendarEvent[]> {
+    return invoke<CalendarEvent[]>("events_for_day", { date });
+  },
+
+  overview(): Promise<CalendarOverview> {
+    return invoke<CalendarOverview>("calendar_overview");
+  },
+
+  /** Events whose reminder is due and undelivered. */
+  dueReminders(): Promise<CalendarEvent[]> {
+    return invoke<CalendarEvent[]>("due_event_reminders");
+  },
+
+  markNotified(id: string): Promise<void> {
+    return invoke<void>("mark_event_notified", { id });
+  },
+};

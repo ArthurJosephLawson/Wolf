@@ -1,0 +1,66 @@
+/**
+ * The wolf widget: sprite, pose label and an optional local-AI status dot.
+ *
+ * Used inside the dashboard and inside the floating companion window.
+ */
+import { useWolfFrame } from "../../hooks/useWolfFrames";
+import { useWolfStore } from "../../stores/wolfStore";
+import { useOllamaSummary } from "../../stores/ollamaStore";
+import { WolfSprite } from "./WolfSprite";
+
+export interface WolfWidgetProps {
+  scale?: number;
+  showStatus?: boolean;
+  onClick?: () => void;
+  title?: string;
+}
+
+export function WolfWidget({
+  scale = 3,
+  showStatus = true,
+  onClick,
+  title,
+}: WolfWidgetProps) {
+  const state = useWolfStore((s) => s.state);
+  const { frame, label } = useWolfFrame(state);
+  const ollama = useOllamaSummary();
+
+  return (
+    <div className="wolf">
+      <div
+        className="wolf__sprite-wrap"
+        // The whole block is one interactive target for the companion window.
+        onClick={onClick}
+        role={onClick ? "button" : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        onKeyDown={
+          onClick
+            ? (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onClick();
+                }
+              }
+            : undefined
+        }
+      >
+        <WolfSprite
+          frame={frame}
+          scale={scale}
+          data-state={state}
+          title={`${label}. ${title ?? "Wolf"}`}
+        />
+      </div>
+      {showStatus ? (
+        <p className="wolf__status" aria-live="polite">
+          <span
+            className="wolf__dot"
+            data-tone={ollama.tone}
+            aria-hidden="true"
+          />
+          {label}
+        </p>
+      ) : null}
+    </div>
+  );
+}

@@ -1,0 +1,146 @@
+/*
+ * Animations.
+ *
+ * Deliberately cheap: transforms and opacity only, short durations, and the wolf
+ * loop is driven by React state rather than a continuous rAF render.
+ */
+
+@keyframes wolf-step {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes pixel-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pixel-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pixel-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pixel-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes pixel-blink-dot {
+  0%,
+  70%,
+  100% {
+    opacity: 0.25;
+  }
+  35% {
+    opacity: 1;
+  }
+}
+
+@keyframes pixel-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-2px);
+  }
+  40% {
+    transform: translateX(2px);
+  }
+  60% {
+    transform: translateX(-1px);
+  }
+  80% {
+    transform: translateX(1px);
+  }
+}
+
+@keyframes pixel-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.anim-fade-in {
+  animation: pixel-fade-in 160ms steps(3, end) both;
+}
+
+.anim-pop-in {
+  animation: pixel-pop-in 200ms steps(4, end) both;
+}
+
+.anim-slide-in {
+  animation: pixel-slide-in 180ms steps(3, end) both;
+}
+
+.anim-pulse {
+  animation: pixel-pulse 1.4s steps(2, end) infinite;
+}
+
+.anim-blink-dot {
+  animation: pixel-blink-dot 1.2s steps(2, end) infinite;
+}
+
+.anim-shake {
+  animation: pixel-shake 320ms steps(2, end) 1;
+}
+
+.wolf-sprite {
+  animation: wolf-step 1.2s steps(2, end) infinite;
+}
+
+.wolf-sprite[data-state="sleeping"],
+.wolf-sprite[data-state="break"] {
+  animation-duration: 2.4s;
+}
+
+/* Respect the user's motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

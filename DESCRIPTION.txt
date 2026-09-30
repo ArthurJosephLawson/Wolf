@@ -1,0 +1,1500 @@
+================================================================================
+ WOLF — A PROJECT DESCRIPTION
+ Written for Claude Code, and for engineers joining the project cold
+================================================================================
+
+This describes the code, not the README. Where the two disagree, section 21 names the disagreement and the relevant section repeats it inline.
+
+  1 What the project is        9  The database layer          17 Signals
+  2 Technology stack          10  The local AI transport       18 Styles
+  3 Repository layout         11  AI intent and context        19 Tests
+  4 Getting it running        12  Desktop integration          20 Numbers
+  5 Architecture              13  The frontend shell           21 Gaps and drift
+  6 Window and process model  14  The stores                   A Command reference
+  7 The IPC boundary          15  Pure logic                   B File map
+  8 The Rust backend          16  The wolf sprite pipeline
+
+How to read this document
+-------------------------
+Sections 1-4 orient you. Sections 5-7 are the three rules everything else follows
+from, and they are the shortest useful summary of the design. Sections 8-13 are the
+two halves of the application in dependency order: Rust first, then React. Sections
+14-17 are the frontend's state, its pure logic, and the wolf. Sections 18-19 are
+appearance and verification. Section 20 is the inventory to check a claim against.
+Section 21 is the honest part. Appendices A and B are lookup tables.
+
+Inventory at the time of writing
+--------------------------------
+  Rust (src-tauri/src)  5,434 lines / 34 files    Tests    98 Vitest + 67 Rust
+  TS and TSX (src)      8,793 lines / 55 files    Commands 49 registered, 47 invoked
+  CSS                     1,059 lines / 4 files   Frames   32, from one 28x28 matrix
+  SQL migrations             77 lines / 2 files    Themes   1. One palette.
+  Shell and Node scripts    569 lines / 5 files    Stores   8. Routes and pages: 7 each.
+  Markdown                   344 lines / 3 files
+
+Two facts to carry before anything else
+---------------------------------------
+1. Wolf is local-first in the literal sense. Its data is one SQLite file under $XDG_CONFIG_HOME; its optional assistant talks to a locally running Ollama. No accounts, telemetry, crash reporting or update check. The frontend capability list grants 20 permissions, all window, event, app-metadata or opener related. There is no filesystem, shell, HTTP or clipboard permission.
+
+2. Wolf has one-directional dependencies in both halves. Commands are thin, stores hold no rendering logic, services are the only place that knows an IPC command name, and the wolf's pose is derived from a signal rather than stored. Nearly every unusual decision in this project follows from those two lines.
+
+
+================================================================================
+ SECTION 1 — WHAT THE PROJECT IS
+================================================================================
+
+1.1 In one paragraph
+---------------------
+Wolf is a single-window productivity companion for Linux desktops: a Tauri 2 shell with a React 19 + TypeScript frontend over a Rust backend. It manages four domains — tasks, habits, calendar events, focus sessions — plus an optional local LLM assistant, plus a pixel-art wolf in its own always-on-top transparent window whose pose reflects what the application is doing. All persistent state is one SQLite file. The wolf is not decoration: it shares a signal bus with the focus timer and the task list, and its pose is a pure function of a coarse signal.
+
+1.2 Product surfaces
+--------------------
+  Tasks      A list with client-side filtering, sorting and search, a quick-add row on the dashboard, and a create/edit dialog. Priorities 0..3, due dates are calendar dates, and completion is expressed three ways at once (fill, strikethrough, dimmed row) so it survives greyscale.
+  Habits     Daily / weekday / weekly habits with a 28-day completion grid and current and best streaks, computed in Rust rather than the browser because whether a day counts depends on the habit's frequency.
+  Calendar   A month grid padded to whole Monday-based weeks, day detail, and per-event reminders. Day cells carry two dots: events, and open tasks due that day.
+  Focus      A Pomodoro state machine — focus, short break, long break — with pause, skip and reset, and a persisted session history. One 250 ms interval drives it; the machine itself is a pure function.
+  Assistant  Streaming chat against a local model. Rust can classify a question into one of eight intents and assemble a capped, intent-scoped block of the user's own data. It is read-only: it cannot change anything.
+  Companion  A second borderless transparent window holding the wolf at a user-controlled scale: draggable, hideable, togglable always-on-top, double-clickable to raise the main window.
+  Desktop    System tray with real actions, close-to-tray, D-Bus notifications, and 1-7 number-key navigation between screens.
+
+1.3 What Wolf is not
+---------------------
+Not a sync client (no account, server, conflict resolution or upload), not a team tool (no sharing, comments, assignment or roles), and not an AI agent: there is no tool calling, no function schema, and no path from a model response to a data mutation. Nor is it trying to be beautiful in the modern sense — the visual language is deliberately hard-edged: 2px borders, 3px hard shadows, zero border radius, one bitmap font, steps() easing everywhere, and -webkit-font-smoothing: none.
+
+1.4 Why the wolf exists
+-----------------------
+The wolf is the differentiator, and it is a state display rather than an illustration. Every pose means something the user actually did: offline, speaking, thinking, focus-active, focus-paused, break-active, task-completed, task-created, all-clear, busy, poked, sleep. None of it is persisted; docs/ARCHITECTURE.md's ownership table says "Wolf pose — in-memory, derived from the above — pure UI reaction, nothing to persist."
+
+
+================================================================================
+ SECTION 2 — TECHNOLOGY STACK
+================================================================================
+
+2.1 Shell and frontend
+-----------------------
+  Tauri 2 (2.12.0), features ["tray-icon", "image-png"]; tauri-plugin-opener 2.6.0; tauri-plugin-single-instance 2.5.0, desktop targets only and cfg-gated out on android and ios.
+  react 19.3, react-dom 19.3, zustand 5.0.15, vite 8.3.1 (dev server on a fixed port 5273 with strictPort), typescript 5.9.3, vitest 5.0.2 in jsdom, eslint 10.11 flat config, prettier 3.9.9 on defaults because there is no config file.
+
+withGlobalTauri is false, so the __TAURI__ global does not exist. Detecting it would report "browser" while sitting inside a real webview, which is why bridge.ts probes __TAURI_INTERNALS__ instead.
+
+There is no UI framework: no Tailwind, no PostCSS config, no CSS-in-JS, no icon package. Icons are literal glyphs chosen because their shapes exist in a bitmap font — diamond, check, circle, grid, half-circle, question and gear for navigation, pencil to edit, box unchecked, skip and reset for the timer, house, panel and cross for the companion toolbar. Sidebar icons are aria-hidden; the text label carries the meaning.
+
+tsconfig.json is unusually strict and worth copying: strict, noUnusedLocals, noUnusedParameters, noFallthroughCasesInSwitch, noUncheckedIndexedAccess, noImplicitOverride, forceConsistentCasingInFileNames, verbatimModuleSyntax, isolatedModules, resolveJsonModule, noEmit.
+
+2.2 Backend
+-----------
+  rust edition 2021, rust-version 1.82
+  rusqlite 0.40 with features ["bundled", "chrono"] — SQLite is compiled in, so no system libsqlite3 is needed
+  chrono 0.4 with serde; serde, serde_json 1; thiserror 2; log 0.4
+  uuid 1 with v4 — every row id is a UUIDv4 string
+  reqwest 0.12, lock resolves 0.13.5, default-features = false with ["json", "stream"] — no TLS backend is compiled in, so an https Ollama URL cannot work even if it is configured; see 21.5
+  tokio 1 with ["sync","time","rt","macros"] — only for the async runtime Tauri already provides; Wolf schedules nothing itself
+  futures-util 0.3
+  notify-rust 4, default-features = false with ["d"] — D-Bus only, deliberately not the X11 backend
+  tempfile 3 declared as a dev-dependency and never used
+
+Release profile: codegen-units = 1, lto = true, opt-level = "s", panic = "abort", strip = true. A 2 MB desktop companion should be small.
+
+2.3 Build, configuration and system dependencies
+-------------------------------------------------
+  package.json                  20 scripts, 4 dependencies, 16 devDependencies
+  vite.config.ts                two rollup inputs, port 5273, HMR 5274, and the Vitest block — there is no vitest.config.ts
+  tsconfig.json, eslint.config.js, src-tauri/tauri.conf.json (windows, CSP, bundle), src-tauri/capabilities/default.json (20 permission entries), src-tauri/Cargo.toml, migrations/
+
+No .prettierrc, biome config, tailwind config, postcss config, rust-toolchain.toml, .editorconfig, .nvmrc, .env.example, or CI configuration of any kind. The MSRV is pinned only in Cargo.toml; the Node floor only by engines.node ">=20".
+
+System libraries are WebKitGTK 4.1, GTK 3, OpenSSL and libsoup 3. The .deb declares libwebkit2gtk-4.1-0, libgtk-3-0 and libayatana-appindicator3-1. The tray also wants a StatusNotifier host, which GNOME does not provide by default. scripts/check-dependencies.sh probes all of it read-only and exits non-zero on a missing hard requirement; scripts/setup-arch.sh installs 18 packages with pacman and is safe to re-run.
+================================================================================
+ SECTION 3 — REPOSITORY LAYOUT
+================================================================================
+
+3.1 Root and frontend
+---------------------
+At the root: README.md (149 lines), DESCRIPTION.txt, LICENSE (MIT), .gitignore, index.html (main window) and companion.html (companion window), package.json and package-lock.json, vite.config.ts, tsconfig.json, eslint.config.js, docs/ARCHITECTURE.md (114 lines), docs/DEVELOPMENT.md (81 lines), migrations/ (two numbered .sql files), public/ (three favicons), scripts/ (5 files: 2 shell, 3 node), src/, src-tauri/, and the gitignored dist/ and node_modules/. Three markdown documents exist in the whole repository. No CHANGELOG, no CONTRIBUTING, no ROADMAP, no AGENTS.md, no CI workflow, and no TODO, FIXME, XXX or HACK markers anywhere in source, config or docs — so section 21 is the only place outstanding work is recorded, which is one reason this document exists.
+
+In src/:
+
+  main.tsx, companion.tsx    window entrypoints
+  App.tsx                    shell, navigation, keyboard, tray listeners (252)
+  types/index.ts             353 lines, every domain type, mirroring Rust models
+  hooks/useWolfFrames.ts     the only custom hook file in the project
+  assets/wolf/               wolf-pixels.json, sprites.ts (802), animation.ts,
+                             sprites.test.ts
+  assets/fonts/              Silkscreen-Regular.ttf, Silkscreen-Bold.ttf, OFL.txt
+  assets/icons/, sounds/     EMPTY — leftovers
+  services/desktop/          bridge.ts (the invoke guard), desktopService.ts,
+                             ipcContract.test.ts
+  services/database/         taskService, habitService, calendarService,
+                             focusService, settingsService
+  services/ollama/           OllamaClient.ts, transport.ts, types.ts, and its test
+  services/notifications/    notify.ts
+  services/errors.ts         WolfAppError, toAppError
+  stores/                    8 Zustand stores, one per domain
+  utils/                     date.ts, taskLogic.ts, timerLogic.ts + 3 test files
+  pages/                     7 pages, one directory per screen
+  components/                12 files in six non-empty directories (common/,
+                             Dashboard/, Tasks/, Calendar/, FocusTimer/,
+                             Notifications/, WolfWidget/); Assistant/, Habits/ and
+                             SystemTray/ exist but are EMPTY
+  styles/                    globals.css (728), theme.css, pixel.css, animations.css
+
+There is no services/api.ts and no services/desktop.ts. The desktop concerns are a directory; the database commands live under services/database/. There is no tokens.css.
+
+3.2 Backend layout
+------------------
+src-tauri/ holds Cargo.toml, Cargo.lock, build.rs, tauri.conf.json, capabilities/default.json, icons/ (11 generated PNGs) and gen/schemas/ (generated, gitignored). Its src/ contains main.rs, lib.rs, state.rs, error.rs, and the directories commands/, models/, database/, ai/, ollama/, notifications/, tray/ and windows/ — each described in appendix B.
+
+There is no companion/ directory: the companion window is an ordinary webview loading companion.html, not a native module. There is also no src-tauri/tests/ — every Rust test is a #[cfg(test)] unit test inside the module it tests, so no test can exercise anything that needs an AppHandle.
+
+scripts/ is in the ESLint ignore list, so none of its five files are linted.
+
+
+================================================================================
+ SECTION 4 — GETTING IT RUNNING
+================================================================================
+
+4.1 Daily commands
+------------------
+  bash scripts/check-dependencies.sh   read-only, lists what is missing
+  bash scripts/setup-arch.sh           installs it (Arch family)
+  npm install
+  npm run dev            tauri dev — the normal way to work on Wolf
+  npm run dev:web        vite only, in a browser; shows a fallback notice
+  npm run verify         typecheck + lint + test + cargo check + cargo test
+  npm run rust:clippy    needs `rustup component add clippy` once
+  npm run format         prettier --write over ts/tsx/css/md/json
+  node scripts/generate-icons.mjs    regenerate app, tray and favicon PNGs
+
+Prerequisites are Node 20+, Rust via rustup and the system libraries in 2.3. Ollama is optional; without it every other feature works. npm run dev starts Vite on localhost:5273 and opens the Tauri window against it. npm run dev:web has no native layer, so the UI renders a "Wolf needs its desktop shell" notice instead of a broken dashboard. The script list has 20 entries: dev, dev:web, tauri, build, build:web, preview, typecheck, lint, lint:fix, format, format:check, test, test:watch, rust:check, rust:test, rust:fmt, rust:clippy, check:deps, setup:arch, verify. The README's command table documents a subset of them.
+
+4.2 Vite specifics
+------------------
+  server.port 5273 with strictPort, and hmr.port 5274 only when TAURI_DEV_HOST is set. server.watch.ignored is **/src-tauri/** so Rust target churn cannot trigger frontend reloads. envPrefix is ["VITE_", "TAURI_ENV_*"]. The build has two inputs (main -> ./index.html, companion -> ./companion.html), target chrome105 on Windows and safari15 elsewhere, outDir dist with emptyOutDir, minify !TAURI_ENV_DEBUG and sourcemap !!TAURI_ENV_DEBUG. The test block is jsdom with globals: false, restoreMocks: true and isolate: false.
+
+If 5273 is taken you must change devUrl in tauri.conf.json and server.port in vite.config.ts together; Tauri will not tolerate a dev server that wanders.
+
+4.3 Adding a feature, in the prescribed order
+---------------------------------------------
+docs/DEVELOPMENT.md gives a six-step order, and it is worth following because each step has a matching test surface:
+
+  1  Model and validation in src-tauri/src/models/. Every write path validates here.
+  2  Repository method in src-tauri/src/database/. Filtering belongs in SQL, not in Rust loops.
+  3  Command in src-tauri/src/commands/. A thin adapter: unpack args, call the repository, wrap the error. No branching logic.
+  4  Service method in src/services/. The only place the command name appears.
+  5  Store action in src/stores/. No rendering concerns.
+  6  Component or page. Reads the store, dispatches actions.
+
+If a new field must be shared between the two windows, add it to SettingsPatch too, or the companion will clobber it.
+
+4.4 Conventions that are enforced
+---------------------------------
+No `any`: if a command returns something awkward, type it in types/. Errors carry a `kind`, so the UI can choose between a message and a log line. Comments explain why, not what. The wolf palette is data: add a colour to wolf-pixels.json and to COLOR in sprites.ts, never by editing a PNG. Nothing but src/services/ may call invoke — checked by review and by the ipcContract test, not by the type system. And there are no component-rendering tests at all (see section 19).
+================================================================================
+ SECTION 5 — ARCHITECTURE
+================================================================================
+
+5.1 The one-way graph and state ownership
+------------------------------------------
+  React pages/components  ->  Zustand stores  ->  service layer  ->  Tauri IPC
+                                                                       |
+                                                                       v
+  Rust commands  ->  database + models            ai/  ->  database
+
+Nothing below a layer imports from above it, which gives two things docs/ARCHITECTURE.md calls out: the service layer is the only place that knows command names, so renaming a Rust command breaks the TypeScript build rather than production; and stores hold neither rendering nor I/O concerns, so they can be driven in tests with a fake service.
+
+State ownership is explicit. Tasks, habits, events and focus sessions live in SQLite, which must survive restarts and doubles as the backup format. Settings live in SQLite and are mirrored into managed Rust state, because the companion and the tray share them. The timer phase is in memory, seeded from the last session row, and must tick with no database round trip. The wolf's pose is in memory and derived — a pure UI reaction, nothing persisted. The chat transcript is in memory and deliberately not persisted.
+
+The timer is the interesting case. utils/timerLogic.ts is a pure function of (snapshot, action, now); React supplies `now` on a 250 ms interval and the store persists exactly once per phase transition. That is why the timer survives a remount without drift and is testable without a fake clock library.
+
+5.2 Settings patching
+---------------------
+Both windows write settings and they own different fields. Naive full-object writes meant a companion drag could clobber assistant preferences written a moment earlier. SettingsPatch plus Settings::apply_patch makes every write partial at the Rust boundary, so the loser of a race loses only its own fields.
+
+None in a patch means "leave alone". That semantic is load-bearing: it is what stops save_companion_position from resetting the user's Ollama model, focus durations or theme.
+
+5.3 Two windows
+---------------
+index.html and companion.html are separate Vite inputs with separate entrypoints, one bundle output, one Rust process. The companion is transparent, undecorated, skipTaskbar, and starts hidden. Because it is a different document it has its own React tree and its own store instances — Zustand singletons are per JavaScript context — so the two contexts talk only through IPC and Tauri events. That is exactly why shared logic lives in services rather than in shared singletons: the same code has to run in both windows without assuming one store exists.
+
+5.4 AI context
+--------------
+ai/mod.rs classifies the question into a small intent enum and assembles only the sections that intent needs, so asking about overdue tasks never loads the calendar and never loads the full task table — tasks_section filters in SQL. The assembled block is capped before concatenation and the request body is capped separately. The privacy property is weaker than the docs claim: there is no host allowlist on the Ollama URL. See section 21.
+
+5.5 How an error travels
+------------------------
+The same six-hop path every time, and it is worth stating once:
+
+  repository    returns WolfResult<T>; validation errors are WolfError::Invalid
+  command       unwraps arguments and maps the error with `?`, adding no meaning
+  transport     serde turns the error into {"kind", "message"} with no stack
+  service       catches and rethrows a WolfAppError carrying the same kind
+  store         sets its own `error` string and leaves `loading` false
+  component     renders ErrorNote with the message, or a StatusPill for a
+                non-critical kind
+
+Two conventions make this bearable. The `kind` — not the message — is what callers branch on, so a message can be reworded without breaking a `switch`. And a background refresh is allowed to fail silently (habitStore.refresh, calendarStore.upcoming) while a user-initiated action always surfaces its failure, because the two have different costs.
+
+
+================================================================================
+ SECTION 6 — WINDOW AND PROCESS MODEL
+================================================================================
+
+6.1 Windows
+-----------
+  main       index.html,      1180x760, min 880x560, resizable, centered,
+             decorated, visible, focused, dragDropEnabled: false
+  companion  companion.html,  132x148, not resizable, undecorated, transparent,
+             no shadow, alwaysOnTop, skipTaskbar, initially hidden, with
+             x: 320, y: 180 as a static fallback
+
+The companion's 132x148 base size matches the sprite's footprint, so clicks never land on dead transparent pixels. dragDropEnabled is false because a dropped file must not navigate the webview away.
+
+6.2 Startup sequence (src-tauri/src/lib.rs)
+-------------------------------------------
+  1  Resolve the database path and open it. On failure, print two lines to stderr and exit(1): "wolf: could not open the local database: {reason}" and "wolf: expected it under $XDG_CONFIG_HOME/wolf/wolf.db (usually ~/.config/wolf/wolf.db)". The source comment explains the choice: without a database Wolf cannot do anything useful, and an empty window would hide the reason.
+  2  Load settings. A failure logs a warning and falls back to defaults rather than aborting.
+  3  Snapshot two booleans (companion_enabled, start_minimized) before moving the closure into the builder.
+  4  Build the app: the single-instance plugin, whose callback ignores argv and cwd and simply shows the main window; the opener plugin; .manage(AppState::new()); and generate_handler! with 49 commands.
+  5  In setup: build_tray, whose failure is non-fatal; ensure_companion when enabled, whose failure warns and emits wolf://companion-error; and hide_main when start_minimized, whose failure only warns.
+  6  on_window_event: on CloseRequested for the main window, call handle_close_requested and prevent_close() if it returns true.
+  7  On RunEvent::ExitRequested, persist the companion position.
+
+6.3 Close behaviour and single instance
+----------------------------------------
+handle_close_requested reads close_to_tray, defaulting to true if the state is unavailable. When true it persists the companion position, hides the main window and returns true so the close is prevented; the app then lives in the tray until Quit. The single-instance plugin is registered for desktop targets only, so a second launch focuses the existing window. That is what makes close-to-tray feel like an application rather than a window.
+
+6.4 No animation loop in Rust
+-----------------------------
+Everything animated is CSS or TypeScript. Rust has no setInterval, no tick thread and no animation frame equivalent; the only timer-like behaviour is the position persist on exit. state.rs still declares a `pub type SchedulerHandle = Arc<()>` with a comment calling it a marker for a reminder scheduler. No such scheduler exists; see 21.4.
+
+
+================================================================================
+ SECTION 7 — THE IPC BOUNDARY
+================================================================================
+
+7.1 One invoke wrapper
+----------------------
+src/services/desktop/bridge.ts is the guard point. isDesktop is computed once at module load as `typeof globalThis.__TAURI_INTERNALS__ === "object"`. The wrapped invoke returns a rejected promise when isDesktop is false:
+
+  Wolf's native layer is not available (command: {command}). Run the app with
+  `npm run dev` so the Tauri shell is present.
+
+That single rejected promise is what turns npm run dev:web into a labelled "desktop unavailable" view instead of a blank screen. The fallback is a development affordance, not a supported mode.
+
+7.2 The exception to the exception
+----------------------------------
+docs/ARCHITECTURE.md claims bridge.ts is the only file that calls invoke. Not quite: src/services/ollama/transport.ts imports Channel and invoke directly from @tauri-apps/api/core, so the Ollama transport bypasses the isDesktop guard. It still satisfies the looser DEVELOPMENT.md rule that only src/services/ may call invoke. Companion.tsx also imports getCurrentWindow for its closeCompanion escape hatch.
+
+Rust commands take snake_case parameters, and Tauri converts keys, so the frontend sends camelCase: taskService sends { id, update }, habitService { habitId, date }, settingsService { settings }. One inconsistency is worth knowing: habitService.completions sends { id: habitId } because the Rust parameter is literally named `id`.
+
+7.3 The ipcContract test
+------------------------
+Because command names and argument keys only resolve at runtime, a typo is otherwise a production-only failure. ipcContract.test.ts closes that gap by parsing both sides and comparing them. It regexes every invoke("name", { ... }) call out of src/, skipping test files, finding 47; parses the generate_handler! block out of lib.rs, finding 49 registrations; and parses each `pub fn <name>(...)` signature in src-tauri/src/commands/, dropping injected parameters (app, state, window, channel, self) and &str parameters, then camelCases what remains. It asserts every frontend call maps to a registered command and that every argument key is one the Rust function accepts, and it first asserts both sides found more than 40 entries so a broken regex fails loudly instead of passing vacuously.
+
+It is a static check, not a behavioural one. See 21.8.
+================================================================================
+ SECTION 8 — THE RUST BACKEND
+================================================================================
+
+8.1 Module shape and AppState
+------------------------------
+Ten public modules: ai, commands, database, error, models, notifications, ollama, state, tray, windows. main.rs calls wolf_lib::run() and nothing else, with a windows_subsystem attribute that hides the extra console window on Windows release builds.
+
+  db               Database, public
+  ollama           OllamaClient, public
+  settings         RwLock<Settings>, private
+  request_counter  AtomicU64, private
+
+settings() reads and clones; a poisoned read lock falls back to Settings::default() rather than panicking. replace_settings writes to SQLite first and only then takes the write lock, and a poisoned write lock becomes WolfError::internal("Settings lock was poisoned."). patch_settings merges, then replaces. next_request_id() is fetch_add(1, Relaxed) formatted as "chat-{n}", so ids run chat-0, chat-1, chat-2. There is also a free function `state(app)` returning WolfError::internal("Wolf is still starting up.") when the managed state is missing, and an unused `SharedState<'r>` alias.
+
+8.2 Errors
+----------
+The module doc states the contract: the frontend renders `message` verbatim, so messages must be written for humans — no stack traces, no raw HTTP dumps, no SQL.
+
+  OllamaError, with the text the user sees:
+    Unavailable    "Ollama is not running at {url}. Start it with `ollama serve`."
+    NoModels       "Ollama is running but has no models installed. Try
+                     `ollama pull {suggestion}`."
+    ModelNotFound  "Model `{model}` is not installed on this machine. Installed
+                     models: {available}."
+    BadStatus      "Ollama returned an unexpected response ({status})."
+    Malformed      "Ollama sent a response Wolf could not read."
+    Transport      "Could not reach Ollama: {0}"
+    Timeout        "The request to Ollama took too long and was cancelled."
+
+  WolfError:
+    Database  "Local database error: {0}"             kind: database
+    NotFound  "{entity} not found."                   kind: not_found
+    Invalid   "{0}"                                   kind: invalid
+    Ollama    transparent                             kind: delegates
+    Desktop   "Desktop integration unavailable: {0}"  kind: desktop
+    Tauri     "Desktop integration failed: {0}"       kind: desktop
+    Internal  "{0}"                                   kind: internal
+
+Serialize is hand-written and emits exactly two fields, {"kind": ..., "message": ...}, so there are twelve distinct kinds across both enums. The frontend's WolfAppError mirrors this and adds isOllamaIssue, true for the seven Ollama kinds, and isNotFound.
+
+8.3 Commands are thin
+---------------------
+commands/mod.rs states the rule in its own doc comment: every command is a thin adapter — validate, delegate to a repository, map errors. No SQL and no business rules live in that module. Its shared helpers are today(), local_now() and week_start(d), which subtracts num_days_from_monday() so weeks start on Monday. Appendix A lists all 49 commands with their arguments; the notable behaviours among them:
+
+  list_tasks           passes today's date so the Today and Overdue filters evaluate in SQL
+  task_overview        three DB calls — stats, today's tasks, overdue tasks — described in its own doc as "the compact rollup for the dashboard header and the AI context builder"
+  uncomplete_habit     `date` is required here, unlike complete_habit where it is optional, a genuine asymmetry in the API
+  upcoming_events      limit.unwrap_or(5).clamp(1, 50)
+  month_summaries      validates 1..=12, then pads to whole Monday-based weeks: from = first - lead, to = last + (6 - last.weekday)
+  list_focus_sessions  limit.unwrap_or(20).clamp(1, 200)
+  focus_stats          window_start = today - 6 days, because "the sparkline always shows a dense 7-day window, not a calendar week"
+  save_settings        replaces settings, then applies them to the desktop
+  select_model         async; resolves a friendly name to a concrete installed tag via ollama.status, then patches ollama_model
+  environment          returns EnvironmentInfo directly rather than WolfResult, because it cannot fail
+
+8.4 Streaming chat
+------------------
+ask_ollama_stream does a pre-flight status check before spawning anything. If the daemon is not Ready it builds the matching OllamaError, sends StreamEvent::Failed over the channel first, and only then returns Err — so the frontend sees the failure as an event, not as a rejected promise. On success it spawns a detached async task and returns AskAck { request_id } immediately, so the caller keeps its busy state until the terminal `done` or `failed` event rather than until the ack. OllamaClient.test.ts has a regression test for exactly this: tokens delivered after the awaited promise resolves are still received, and dispose() stops them.
+
+TRAY_EVENT is re-exported from tray::TRAY_EVENT ("wolf://tray") and COMPANION_ERROR_EVENT is "wolf://companion-error". The lib.rs doc comment states the tray payload shape as { route?: "tasks" | "settings", focus?: "start" | "pause" }.
+
+
+================================================================================
+ SECTION 9 — THE DATABASE LAYER
+================================================================================
+
+9.1 Connection, path and pragmas
+--------------------------------
+  pub struct Database { inner: Arc<Mutex<Connection>> }
+
+The doc comment explains the mutex: Tauri dispatches commands from a multithreaded runtime and rusqlite::Connection is Send but not Sync. Holding a single writer keeps WAL contention and SQLITE_BUSY retries out of the repositories. with_conn takes a closure and maps lock poisoning to WolfError::internal("The local database lock was poisoned by an earlier error.").
+
+Path resolution prefers XDG_CONFIG_HOME, falls back to HOME + ".config", and errors with "Wolf could not determine your home directory. Set HOME or XDG_CONFIG_HOME." if neither exists. The final path is <config>/wolf/wolf.db. open_database creates the parent directory, sets a 5 second busy_timeout, and runs four pragmas:
+
+  PRAGMA journal_mode = WAL;
+  PRAGMA synchronous  = NORMAL;
+  PRAGMA foreign_keys = ON;
+  PRAGMA temp_store  = MEMORY;
+
+open_in_memory skips WAL, synchronous and temp_store, applying only foreign_keys = ON before migrating. That asymmetry matters only for tests.
+
+9.2 Migrations
+--------------
+migrator.rs embeds the SQL at compile time with include_str! and applies it in array order exactly once, recording each name in schema_migrations (name TEXT PRIMARY KEY NOT NULL, applied_at TEXT NOT NULL): ("0001_init", …), ("0002_settings", …). Each pending migration runs inside its own transaction — batch the SQL, insert the bookkeeping row, commit — so a migration either lands fully or not at all. No table is ever dropped or recreated, there is no down migration, and adding one means adding a numbered file plus one tuple. There is no directory scan and no filename parsing at runtime, which is worth flagging against docs/ARCHITECTURE.md: that describes the ordering as lexicographic by filename, but the real ordering is array position.
+
+9.3 Schema
+----------
+migrations/0001_init.sql opens with the timestamp conventions the whole project obeys: an instant is RFC 3339 UTC (2026-09-28T16:19:44.503Z), a date is a local calendar date (2026-09-28), and a datetime is naive local time (2026-09-28T14:30). Five tables, then a key/value one:
+
+  tasks              id TEXT PK; title NOT NULL CHECK (length(trim(title)) > 0);
+                     description DEFAULT ''; completed DEFAULT 0 CHECK IN (0,1);
+                     priority DEFAULT 2 CHECK BETWEEN 0 AND 3; due_date TEXT;
+                     created_at, updated_at NOT NULL; completed_at TEXT.
+                     Indexes on (completed) and (due_date)
+  habits             id; name CHECK (length(trim(name)) > 0); description
+                     DEFAULT ''; frequency DEFAULT 'daily' CHECK IN
+                     ('daily','weekdays','weekly'); target_per_period DEFAULT 1
+                     CHECK (> 0); color DEFAULT 'green'; created_at; archived
+                     DEFAULT 0. Index on (archived)
+  habit_completions  id; habit_id REFERENCES habits(id) ON DELETE CASCADE;
+                     completed_at NOT NULL; UNIQUE (habit_id, completed_at).
+                     Index on (habit_id, completed_at DESC)
+  calendar_events    id; title CHECK; description DEFAULT ''; start_time,
+                     end_time NOT NULL; all_day DEFAULT 0 CHECK;
+                     reminder_minutes; notified_at; created_at, updated_at.
+                     Index on (start_time)
+  focus_sessions     id; started_at; ended_at; duration_seconds DEFAULT 0 CHECK
+                     (>= 0); completed DEFAULT 0 CHECK; kind DEFAULT 'focus'
+                     CHECK IN ('focus','short_break','long_break'). Index on
+                     (started_at DESC)
+  settings           key TEXT PRIMARY KEY, value TEXT NOT NULL,
+                     updated_at TEXT NOT NULL   (migrations/0002_settings.sql)
+
+There are no triggers and no views anywhere in the project. Note that tasks.priority defaults to 2 in SQL while PRIORITY_NORMAL is 1 in Rust; Rust always supplies the value explicitly, so the SQL default is dead.
+
+9.4 Validation lives in the repository
+---------------------------------------
+Task and habit titles and names are trimmed, non-empty and length-capped (200 and 120 characters); priority must be 0, 1, 2 or 3; task due dates must parse as %Y-%m-%d; target_per_period is clamped to 1..=14; event times must parse as %Y-%m-%dT%H:%M with end not preceding start, all-day events confined to one calendar day, and reminder_minutes filtered to <= 1440; focus timestamps must parse as RFC 3339 with end not preceding start and duration clamped to at most 86,400 seconds. Every message is written for a human: "A task needs a title.", "That month does not exist.", "`2026-02-30` is not a valid date (expected YYYY-MM-DD)."
+
+9.5 Query construction
+----------------------
+list_tasks builds its SQL dynamically and prepares it exactly once, collecting positional arguments as Vec<Box<dyn ToSql>>. All adds no clause; Active adds `completed = 0`; Completed adds `completed = 1`; Today adds `due_date = ?`; Overdue adds `completed = 0 AND due_date IS NOT NULL AND due_date < ?`; and search adds `(LOWER(title) LIKE ? OR LOWER(description) LIKE ?)`.
+
+Every sort starts with `completed ASC` so open work floats above finished work, and most continue with `due_date IS NULL ASC` so undated tasks sit at the bottom rather than the top. The five sorts are Default (due, priority, created), DueDate (due, priority), Priority (priority, due), Alphabetical (LOWER(title)) and Created (created_at DESC).
+
+9.6 Partial updates
+-------------------
+update_task uses a single COALESCE statement, so a partial update is one statement rather than a read-modify-write. The double-Option on due_date in TaskUpdate is what makes the clearing case work: the outer Option says the field was present, the inner None says it was explicitly cleared. A side effect worth knowing: completed_at is rewritten whenever `completed` is supplied, even when the value is unchanged.
+
+calendar_events takes the opposite approach — read-modify-write, because the all-day rule depends on the existing row. It re-validates after merging and only then writes, which is why update_rejects_invalid_bounds_and_keeps_state can assert the old value survived.
+
+9.7 Settings persistence
+------------------------
+SETTINGS_KEY is the single row key "app", and the whole Settings object is stored as one JSON blob with `INSERT … ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`. load_settings swallows a missing row to None and a JSON parse failure to a warning plus defaults. Both save_settings and load_settings run the object through Settings::sanitized(), so a corrupt-but-valid-JSON row cannot persist an out-of-range value. Because it is one blob, an older binary silently drops fields a newer one added — see 21.5.
+
+9.8 Habit streaks
+-----------------
+Two pure functions do the work, both over a BTreeSet of completion dates and both driven by HabitFrequency::is_due_on. current_streak walks backwards from today; if today is scheduled but not done, counting starts from the previous day; it breaks at the first scheduled-but-missing day and skips unscheduled days without breaking. longest_streak makes one ascending pass, resetting the run counter at any scheduled-but-missing day. Both use HORIZON_DAYS = 400 as a bound.
+
+The progress payload carries RECENT_WINDOW_DAYS = 28 entries oldest-first, plus a completions_30d count computed over an inclusive 30-day range — the names disagree by two days, which is harmless but confusing when reading the code. complete_habit inserts with ON CONFLICT (habit_id, completed_at) DO NOTHING, so double-completing is idempotent and a test asserts the row count stays at 1. The 10 past-week counts come from habit_summaries, which loops habits and issues one completions query each — an N+1 query, deliberately avoided on the hot path by list_habits_with_progress doing the same thing.
+
+9.9 Focus statistics, and the one real timezone bug
+-----------------------------------------------------
+Two queries and one gap-fill in Rust. The first aggregates today, week and total completed focus sessions and minute sums; the second returns per-day minutes grouped by day. daily_minutes is then filled to exactly 7 entries so the sparkline always has 7 points, oldest first.
+
+Both queries compare substr(started_at, 1, 10) against the date string the caller passes — and that string is a *local* date while started_at is UTC. This is the one real timezone bug in the project; it is invisible except near midnight.
+
+9.10 Transactions and atomicity
+-------------------------------
+Single statements are atomic for free. The places that need more get it explicitly, and it is worth knowing which is which:
+
+  migration      a whole file plus its schema_migrations row, in one transaction
+  settings       one upsert; the JSON is serialised before the statement runs
+  habit toggle   INSERT … ON CONFLICT DO NOTHING, so a double-click is a no-op
+  event update   read, merge, re-validate, then one UPDATE — the read and write
+                 are not in one transaction, but the re-validation makes a
+                 concurrent edit benign rather than corrupting
+  focus session  one insert; the timer state that produced it lives in memory
+
+Not transactional anywhere: multi-table operations. Nothing in Wolf writes to two tables in one unit of work — the closest is archiving a habit, which flips a flag rather than moving rows — so there is no place a transaction boundary is currently load-bearing except migrations. The habit UNIQUE (habit_id, completed_at) constraint is the one integrity guarantee the application relies on instead of checking first.
+================================================================================
+ SECTION 10 — THE LOCAL AI TRANSPORT
+================================================================================
+
+10.1 Scope, client and endpoints
+---------------------------------
+The module doc is unambiguous: Wolf talks to a locally running `ollama serve` and nothing else. No cloud fallback, no API key, no proxy. The constants are DEFAULT_OLLAMA_URL "http://localhost:11434", SUGGESTED_MODEL "qwen2.5-coder", CONNECT_TIMEOUT 1500 ms and REQUEST_TIMEOUT 180 s.
+
+OllamaClient holds one reqwest::Client built with connect_timeout(1500 ms), timeout(180 s), redirect(Policy::none()) and user_agent("Wolf/0.1.0"). The redirect policy carries a comment stating the intent: "Wolf never follows redirects to somewhere other than the local daemon." A build failure falls back to reqwest::Client::new(). Note what is *not* there: no host allowlist. The URL comes from settings and is only ever concatenated with a fixed path via format!("{}{}", base.trim_end_matches('/'), path). See 21.5.
+
+Only three endpoints are used: GET /api/version as a reachability probe, GET /api/tags for installed models, and POST /api/chat with stream false or true. There is no /api/copy, /api/delete, /api/pull or /api/embeddings call anywhere in the crate. Wolf never installs a model for you.
+
+10.2 Error mapping and model resolution
+-----------------------------------------
+Transport errors map in this order: is_timeout() to Timeout; is_connect() or is_request() to Unavailable { url: base }; is_decode() or is_body() to Malformed; anything else to Transport(err.to_string()). A non-2xx becomes BadStatus with the numeric code, a JSON decode failure becomes Malformed, and an inline `error` field in a 200 response becomes Transport("Ollama reported: {message}") after a warn log.
+
+resolve_model lowercases the request, then tries: an empty request falls back to models.first(); an exact case-insensitive name match; a base-name-before-colon match, so `qwen2.5-coder` resolves to `qwen2.5-coder:7b`; and otherwise None, which becomes ModelNotFound. A blank model is rejected before any HTTP request at all, with ModelNotFound { model: "(none)", available: "choose a model in Wolf settings" }.
+
+status() never propagates a failure. If /api/version fails it returns OllamaStatus { state: Offline, detail: <the error text>, models: [] } and continues; if /api/tags fails it falls back to an empty list. Its detail strings are "Ollama {version} is running but has no models. Pull one with `ollama pull qwen2.5-coder`." for NoModels, "Ollama {version} · {resolved model}" for Ready, and "Ollama {version} is running, but `{model}` is not installed. Available: {joined names}." for ModelMissing. version_label falls back to "(unknown version)".
+
+10.3 Request body and StreamEvent
+----------------------------------
+The body is { model, messages, stream, keep_alive: "10m", options }, where options is { temperature: 0.2, num_predict: 512 } and is omitted entirely when both values are None. keep_alive defaults to "10m" so a local model stays warm between questions. ChatRequest::to_api_messages prepends the system prompt (defaulting to ai::system_prompt) and, when context is non-empty, appends it verbatim wrapped as "\n\n<local_context>\n" + context.trim() + "\n</local_context>".
+
+StreamEvent is a tagged enum serialised with #[serde(tag = "type", rename_all = "camelCase")]:
+
+  {"type":"token",  "requestId":"chat-0", "text":"..."}
+  {"type":"done",   "requestId":"chat-0", "summary":{...}}
+  {"type":"failed", "requestId":"chat-0", "message":"...", "kind":"timeout"}
+
+The NDJSON loop appends lossy UTF-8 to a buffer, drains complete lines, trims, skips empties and parses each frame. Three deliberate behaviours: a malformed frame warns and continues, because one bad line should not abort a stream that is otherwise producing good tokens; a failed channel send breaks the loop, because "the window went away; stop burning CPU on tokens"; and a stream that ends without a done frame still emits Done with null timings, because "stream ended without a done frame: still a usable answer".
+
+10.4 Frontend transport
+-----------------------
+src/services/ollama/transport.ts adapts IPC to an OllamaTransport interface of five methods: status, listModels, suggestedModel, ask and askStream. askStream creates a Tauri Channel, assigns onmessage, and invokes ask_ollama_stream with { request, channel }.
+
+OllamaClient wraps that transport with the logic the pages want: URL normalisation (trim, strip trailing slashes, empty falls back to localhost), a model default, a status() that converts any throw into an offline status rather than a rejection, and describeStatus, which maps the four states to a label and a tone — ready is "Ollama online" (ok), no_models is "Ollama online · no models" (warn), model_missing is "Ollama online · model missing" (warn), offline is "Ollama offline" (off), and null is "Checking Ollama…" (warn).
+
+10.5 What the user actually sees when it fails
+----------------------------------------------
+The seven error kinds exist to be shown, not logged, and each one is designed to be the last thing a non-technical user needs to read. The Assistant page renders `message` in full — there is no truncation and no "technical details" expander — so the copy in 8.2 is the whole user interface for a failure.
+
+  Not running      "Ollama is not running at http://localhost:11434. Start it
+                    with `ollama serve`." — actionable, names the exact command
+  No models        "Ollama is running but has no models installed. Try
+                    `ollama pull qwen2.5-coder`." — suggests the specific model
+  Wrong model      "Model `llama3` is not installed on this machine. Installed
+                    models: …" — the Settings page model picker makes this rare,
+                    because select_model validates before saving
+  Wrong daemon     BadStatus carries only the numeric code, because the body of
+                    a non-2xx from some proxies is HTML and useless
+  Partial stream   A malformed frame does not surface at all: it is logged and
+                    skipped, so the answer continues and the user never knows
+  Window closed    A failed channel send is silent by design — there is nobody
+                    left to tell
+
+That last two are the interesting decisions. The instinct is to surface everything, and this codebase deliberately chooses to degrade instead, because a warning toast in the middle of a working answer is worse than a slightly wrong answer.
+
+
+================================================================================
+ SECTION 11 — AI INTENT AND CONTEXT ASSEMBLY
+================================================================================
+
+11.1 Why context is assembled in Rust
+-------------------------------------
+Small models hallucinate happily, so the prompt is explicit about what to trust and the context block is built before the model is contacted. The system prompt is a seven-rule list, condensed: answer only from the <local_context> block, which is the authoritative snapshot; never invent tasks, events, deadlines or times, and if the context does not contain the answer, say what is missing and how to add it; if the block is empty, say so and point at the Tasks, Calendar and Habits screens; keep answers short, with no preamble or filler; when several tasks compete, recommend one and say why in one clause; use plain text, no markdown; and do not suggest sending the user's data anywhere or claim access to anything absent from the context.
+
+There is no confidence score, no numeric threshold, no function-calling schema and no action-dispatch table anywhere in the AI layer. Classification is ordered substring matching and the assistant is strictly read-only.
+
+11.2 Intent classification
+--------------------------
+Intent has eight variants and classify_intent is first-match-wins in this exact order, each group checked with plain `contains`:
+
+  1 Summary    "summar", "how was my day", "recap", "catch me up", "brief me",
+               "status of my day"
+  2 Overdue    "overdue", "late", "behind", "missed"
+  3 Habits     "habit", "streak", "routine"
+  4 Focus      "focus", "pomodoro", "session", "deep work", "concentrat"
+  5 Tomorrow   "tomorrow", "next day"
+  6 Upcoming   "next meeting", "upcoming", "next event", "schedule", "agenda",
+               "calendar"
+  7 Today      "today", "this morning", "this afternoon", "this evening",
+               "right now", "now"
+  - General    fallback
+
+Intent::label() returns "today", "overdue tasks", "upcoming events", "tomorrow's calendar", "habits", "focus sessions", "day summary" or "general". Those labels are what appear in the context header.
+
+11.3 Section inclusion, budgets and formats
+--------------------------------------------
+Each section is loaded only when the intent does not exclude it: tasks is excluded for Habits and Focus; events for Overdue, Habits and Focus; habits only for Habits, Summary and General; focus only for Focus, Summary and General. So "what's overdue?" never loads the calendar, and never loads habits or focus.
+
+  SECTION_LIMIT   1200 characters per section      MAX_EVENTS  12
+  TOTAL_LIMIT     3500 characters assembled        MAX_TASKS   25
+
+cap() keeps the first 1200 characters and appends "… (truncated)". The loop breaks when adding a section would exceed TOTAL_LIMIT, so the block can exceed the total by at most one section; a test asserts exactly that bound. The habit cap is a literal `.take(10)`, not a named constant.
+
+Headers are "Local date: 2026-09-28 (local time 2026-09-28T16:19).", "Question intent: overdue tasks.", "Tasks ({total_open} open in total):", "Calendar (from now):", "Habits:" and "Focus sessions: {today} completed today, {week} this week, {total} all time ({minutes} minutes focused today)." Bullets are "- {title} [{priority}] ({due})" with priority as low/normal/high/urgent and due as "due today", "due YYYY-MM-DD" or "no due date"; "- …and {n} more" when the list overflows; "- {when} — {title}" with an em dash, all-day rendering as "all day YYYY-MM-DD" and timed events as "YYYY-MM-DD HH:MM"; "- {name} — done today|not done today (streak {n}, best {m})"; and "Last 7 days — {date}: {n}m" with month-day only, comma separated.
+
+The tasks section has a fallback: if the intent's filter returns nothing and the filter was not Active, it re-queries with Active, because "Today questions still benefit from seeing what else is open." It also issues a second Active query to compute total_open for the header. Archived habits are excluded via habit_summaries(today, false).
+
+11.4 Two commands the UI never calls
+------------------------------------
+  assistant_context(query)   returns { query, intent, context, system_prompt }
+                             with the block assembled but no model contacted
+  assistant_suggestions()    returns six hard-coded strings: "What do I have
+                             today?", "What tasks are overdue?", "When is my
+                             next meeting?", "What should I focus on next?",
+                             "How many focus sessions did I complete?" and
+                             "Summarize my day."
+
+The Assistant page uses its own SUGGESTIONS list instead, so both commands are dead. See 21.3.
+
+
+================================================================================
+ SECTION 12 — DESKTOP INTEGRATION
+================================================================================
+
+12.1 The companion window
+-------------------------
+Constants: MAIN_WINDOW "main", COMPANION_WINDOW "companion", COMPANION_WIDTH 132, COMPANION_HEIGHT 148. The doc comment notes the window is sized to match the sprite so clicks never land on dead transparent pixels. ensure_companion is idempotent and builds .title("Wolf Companion"), .inner_size(132.0, 148.0), .decorations(false), .transparent(true), .shadow(false), .always_on_top(settings.companion_always_on_top), .skip_taskbar(true), .resizable(false), .visible(false).
+
+Position: if both companion_x and companion_y are Some, use them. Otherwise, if a primary monitor is available, place it bottom-right with margins scaled by the monitor scale factor: x = (monitor.x + monitor.width - 132*scale - 24*scale).max(0.0) and y = (monitor.y + monitor.height - 148*scale - 48*scale).max(0.0).
+
+On exit, and when closing to tray, Wolf writes a patch rather than a full object: companion_x = position.x / scale, companion_y = position.y / scale, and companion_scale = (inner_width / 132).clamp(0.5, 2.0). The comment on that code is the whole argument for SettingsPatch: "A patch, not a full Settings: saving a position must not reset the user's Ollama model, focus durations or theme." Because ensure_companion only applies a stored position when it creates the window, a stored x/y takes effect on the first creation in a session. The stored scale is written but never read back to resize the window in Rust — the frontend applies scale by rendering the sprite at 2.6 * companionScale instead.
+
+12.2 Tray
+---------
+  TRAY_ID "wolf-tray", TRAY_EVENT "wolf://tray"
+
+Menu items in order: open ("Open Wolf"), a separator, show-companion, hide-companion, start-focus, pause-focus, today-tasks, settings, a separator, and quit ("Quit", accelerator Ctrl+Q). tray-22.png is embedded with include_bytes! and decoded with tauri::image::Image::from_bytes, falling back to the default window icon. The builder sets tooltip "Wolf — local productivity companion" and show_menu_on_left_click(false). A left click dispatches TrayAction::Open — the source comment says it "toggles" the window; it actually always shows it. TrayAction is a camelCase-serialised enum with nine variants, and ToggleCompanion has no menu id, so it is reachable only programmatically.
+
+What each action actually does: Open shows the main window and emits nothing; TodayTasks shows the main window and emits {"route":"tasks"}; Settings shows it and emits {"route":"settings"}; StartFocus emits {"focus":"start"}; PauseFocus emits {"focus":"pause"}; ShowCompanion, HideCompanion and ToggleCompanion are window operations only; Quit removes the tray, destroys the companion and exits(0). The frontend reacts by routing (falling back to "home" when the payload has no route), calling focusStore.start() or pause(), and finally calling desktopService.showMain() so the window comes forward either way.
+
+12.3 The reminder sweep
+-----------------------
+due_event_reminders is a command, not a scheduler, and nothing calls it. Its logic, should it ever be wired up: return empty if settings.event_reminders_enabled is false; take a horizon of now + 60 minutes; list events overlapping [today, horizon]; skip events whose notified_at is already set and events with reminder_minutes = None; parse start_time as %Y-%m-%dT%H:%M and skip on failure; compute fire_at as start - reminder_minutes, localised, earliest() only; and include when now >= fire_at and start > now. mark_event_notified sets notified_at and does not error if zero rows changed. Supplying a new reminder clears notified_at so a moved event re-arms, and that behaviour has a dedicated test.
+
+12.4 Notifications and environment
+-----------------------------------
+notify-rust is configured D-Bus-only, which works on both X11 and Wayland. AVAILABLE is a static AtomicBool that starts optimistically true and only flips false after a real failure; it is never re-probed. The builder sets appname("Wolf"), urgency(Critical|Normal) and timeout(10_000).
+
+describe_notify_error turns D-Bus errors into prose: ServiceUnknown or NameHasNoOwner becomes "No notification service is running on this desktop."; NotSupported or AccessDenied becomes "This desktop's notification service refused the request."; anything containing "connection" or "D-Bus" becomes "Could not reach the desktop notification service (is D-Bus running?)"; and everything else becomes "The desktop notification service did not accept this notification." The send_notification command truncates summary to 80 characters and body to 400, using a helper that takes max-1 characters and appends U+2026, which keeps multibyte text valid — there is a test with 50 'é' characters.
+
+`environment` is the one command that returns a bare struct rather than a WolfResult, because it cannot fail: sessionType and desktop come from $XDG_SESSION_TYPE and $XDG_CURRENT_DESKTOP or "unknown"; appVersion from app.package_info().version; dataDir from config_dir()/wolf or "unavailable"; and notificationsAvailable from the notifications module.
+
+12.5 The notification catalogue
+-------------------------------
+src/services/notifications/notify.ts is a fixed table of six factories, one per thing worth interrupting someone for, and it is worth reading in full because it is the only place the product states its own priorities:
+
+  MESSAGES.focusComplete(minutes)  "Focus session complete" / "{minutes} minutes
+    done. Take a short break — Wolf is celebrating."
+  MESSAGES.breakComplete()         "Break over" / "Back to it. Wolf is ready
+    when you are."
+  MESSAGES.habitDue(name)          "Habit reminder" / "Time for {name}."
+  MESSAGES.eventSoon(title, min)   "Starts in {min} min" or "Starting now", body
+    is the title, urgent when min <= 5
+  MESSAGES.taskOverdue(title)      "Task overdue", body is the title, urgent
+  MESSAGES.ollamaOffline()         "Ollama is not running" / "The assistant is
+    unavailable. Everything else works offline."
+
+Three details show the care taken. The bodies are written in second person and name the actual object rather than a category, because a notification is read at a glance from across a desk. `urgent` is reserved for the two cases where the user is relying on the notification to act — an imminent event and an overdue task — so it stays meaningful instead of becoming decoration. And ollamaOffline's body says explicitly that nothing else is affected, which prevents the most likely misreading of an offline daemon.
+
+Three functions wrap that table. `notify` throws NotificationsUnavailableError, carrying a `reason` field, when the desktop refuses. `notifyQuiet` is the fire-and-forget form: it swallows the failure and returns a boolean, and focusStore uses it for the timer notifications so a focus completion that fails to display cannot break the tick that recorded the session. `notificationsAvailable` returns false rather than throwing, because callers use it to decide whether to offer a button at all.
+
+Three of the six are never sent. Only focusComplete and breakComplete have a caller — focusStore, at the moment a phase completes. habitDue, eventSoon, taskOverdue and ollamaOffline are defined and unreferenced: the first two because no scheduler exists (12.3), the last two because nothing in the frontend turns either condition into a notification. That is four of six notification paths unwired, which is the same story as 21.3 and 21.4 rather than a separate oversight.
+
+
+================================================================================
+ SECTION 13 — THE FRONTEND SHELL
+================================================================================
+
+13.1 Entrypoints and navigation
+-------------------------------
+src/main.tsx finds #root, throws "Wolf could not find its root element." if it is missing, and renders StrictMode + <App/>. src/companion.tsx sets documentElement.dataset.window and body.dataset.window to "companion" (the CSS hook is body[data-window="companion"]), loads settings only — the comment says the companion "needs the same preferences as the main window (scale, name, theme) but no data" — then renders StrictMode + <Companion/>. There are no React context providers anywhere in the app; all shared state is Zustand singletons.
+
+Seven routes, in NAV order, with key, label, icon and number key:
+
+  1  home       "Today"       ◆        5  focus      "Focus"       ◐
+  2  tasks      "Tasks"       ✓        6  assistant  "Assistant"   ?
+  3  habits     "Habits"      ◉        7  settings   "Settings"    ⚙
+  4  calendar   "Calendar"    ▤
+
+Route changes never reload data; pages load on mount. The keydown handler returns early if ctrl, meta or alt is held, returns early if the event target is an INPUT, TEXTAREA or SELECT, then maps key - 1 into the NAV index. There is no repeat-key check and no 8+ mapping.
+
+13.2 Shell effects
+-----------------
+In declaration order: load settings once on mount; configureOllama(settings.ollamaUrl, settings.ollamaModel) and, when autoCheckOllama is set, probe and push a wolf signal ("offline" when the state is offline, "all-clear" when ready); stamp data-theme and data-window = "main" on documentElement and body; setInterval(reevaluate, 1000) for the wolf's TTL, cleared on unmount; focusStore.init(settings) whenever the settings object changes; and register tray and companion-error listeners, only when isDesktop. The tray listener is careful about async teardown: it tracks pending subscriptions and calls a disposer that resolves after unmount instead of leaking a listener.
+
+13.3 Browser fallback
+---------------------
+App.tsx returns the Standalone notice only after every hook has run, so in browser mode the effects above still execute and fail gracefully:
+
+  Wolf needs its desktop shell
+  This page is the web frontend, but Wolf keeps its data in a local SQLite
+  database and its AI features in a local Ollama daemon, both reached through
+  Tauri. Start the app with:
+    npm run dev
+
+13.4 Components and accessibility details
+-----------------------------------------
+The shell itself uses Panel, WolfWidget, PixelProgress, Empty, Stat, Chip, ErrorNote and ToastHost. The rest of the inventory is 12 files: common/{ui, PixelProgress, Segmented}, Dashboard/QuickAdd, Tasks/{TaskList, TaskFormDialog}, Calendar/EventFormDialog, FocusTimer/TimerDisplay, Notifications/ToastHost and WolfWidget/{WolfSprite, WolfWidget, Companion}.
+
+Modal installs a capture-phase document keydown listener while open. Escape closes and calls stopPropagation so App's number handler does not also fire; Tab is trapped inside the panel, filtered by offsetParent !== null so hidden elements are skipped; the previously focused element is restored on cleanup. Toast lifetimes are 4,000 ms normally and 8,000 ms for errors, with per-toast setTimeout cleanup; errors use role="alert" and aria-live="assertive", everything else role="status" and aria-live="polite".
+
+TimerDisplay renders a visually-hidden aria-live="polite" paragraph, because "phase changes are the only thing worth announcing" — the countdown itself is aria-live="off" so screen readers are not read a number every 250 ms. WolfSprite emits one <rect> per horizontal run with shapeRendering="crispEdges", role="img" when a title is given and aria-hidden otherwise. Companion keeps a status bubble capped at 46 characters, because "the bubble is a status line, not a chat view", and its toolbar reveals on hover or focus-within.
+================================================================================
+ SECTION 14 — THE STORES
+================================================================================
+
+Eight Zustand singletons, one per domain. No store holds rendering concerns and none performs I/O directly; both go through a service.
+
+14.1 taskStore
+--------------
+State: tasks, filter "all", sort "default", search "", loading, error, lastCompletedId.
+
+load() always fetches the full list with filter "all" and sort "default" and ignores the UI's current filter and sort; filtering and sorting then happen client-side in selectVisibleTasks. That is a deliberate simplification: one round trip, two code paths for presentation.
+
+Mutations are not optimistic. create appends the server's returned row, update and setCompleted replace the row, and remove filters it out — all after the await, so the UI shows truth rather than a guess. consumeCompletion() returns lastCompletedId once and clears it, which is how the dashboard celebrates exactly once per completion.
+
+14.2 habitStore and calendarStore
+----------------------------------
+habitStore holds habits, loading, saving, error. Because streaks and the 28-day grid are computed in Rust, create, update and setArchived all re-list rather than patch locally; remove is the exception and filters locally.
+
+toggleToday is the only optimistic action in the frontend. It reads the current value, flips it immediately, calls complete_habit or uncomplete_habit, rolls back the snapshot on failure, and then refreshes anyway — the comment is "streaks and the 28-day grid come from Rust, so re-read rather than guess." refresh() swallows errors; a background refresh failing is not worth interrupting the user for.
+
+calendarStore holds viewMonth (start of month), selectedDate (today), summaries, events, loading and error. load() fetches month summaries and the selected day's events in parallel; selectDate sets the date then fetches only that day; goToMonth and goToToday change state and reload. create, update and remove all follow with a full load rather than a local patch, and upcoming(limit = 5) swallows every error and returns []. A module-level helper eventsOn(summaries, date) finds one summary.
+
+14.3 focusStore
+---------------
+State: settings, snapshot, sessions, stats, error, lastCompletedPhase. init(settings) is guarded by a JSON.stringify comparison, so a settings write that does not change timer-relevant values cannot discard a running timer.
+
+tick() is the critical method, in order: compute now and the ticked snapshot; if already COMPLETED, store and return; if not complete, only set when `remaining` actually changed; on completion set the snapshot and lastCompletedPhase synchronously — "the status flips synchronously, so a slow await can never double-record"; persist one focus session; await notifyQuiet with focusComplete or breakComplete; await refresh().
+
+selectTimerView exposes primitives rather than the store object so React re-renders once per tick rather than on every unrelated state change.
+
+14.4 settingsStore
+------------------
+State: settings (DEFAULT_SETTINGS), loaded, saving, error.
+
+load() never blocks the app: a failure still sets loaded: true with defaults and an explanatory error, because "never block the app on settings." update(patch) is optimistic and rolls back on failure; selectModel also rolls back. The frontend uses Partial<Settings> rather than a typed patch, so the field-level atomicity guarantee is enforced on the Rust side only.
+
+DEFAULT_SETTINGS duplicates the Rust defaults exactly, including ollamaUrl "http://localhost:11434", ollamaModel "qwen2.5-coder", fallbackModel "gemma2:2b", 25/5/15 minutes, 4 sessions before a long break, theme "midnight", closeToTray, companionEnabled, companionAlwaysOnTop, autoCheckOllama and eventRemindersEnabled true, and habitRemindersEnabled false. Nothing checks that the two copies agree.
+
+useFocusDurations subscribes to the four duration fields individually, because selecting the whole settings object would re-render every consumer on any change.
+
+14.5 ollamaStore, uiStore, wolfStore
+-------------------------------------
+ollamaStore holds status, checking, error, lastCheckedAt (written but never read). A module-level client is created once and reconfigured by configureOllama(url, model). check() returns a status object rather than throwing, synthesising an offline status from the error message when the probe fails; the module doc states the principle: a stopped daemon is a state, not an error. useOllamaSummary merges describeStatus with the checking flag for the titlebar.
+
+uiStore holds route "home", companionVisible, toasts and nextToastId. pushToast reads nextToastId outside the updater and returns the new id. greeting(name, hour) buckets hours: <5 "Still up", <12 "Good morning", <18 "Good afternoon", else "Good evening", appending the trimmed name only when it is non-empty.
+
+wolfStore holds signal, state, expiresAt and pulse. push(signal) resolves the pose, reads the TTL from animation.ts rather than a local copy, and sets expiresAt to null for sticky states. Transient states (speaking, happy, winking, huffing, puffing) increment pulse so a repeat event restarts the animation. pushShared also broadcasts to the companion window, and the receiver uses push rather than pushShared so a signal cannot echo between windows. hold(state) pins a pose with no expiry; settle() returns to the default pose; reevaluate() settles an expired state or re-resolves the current signal.
+
+14.6 Where each signal comes from
+---------------------------------
+  offline            App.tsx, when the auto-check probe finds Ollama down
+  all-clear          App.tsx when ready; FocusPage on phase completion;
+                     SettingsPage after a settings reset
+  task-created       QuickAdd, and the tasks page dialog
+  task-completed     HomePage's inline list, and TasksPage
+  busy / default     HomePage's pressure effect, local push only, and CalendarPage
+  focus-paused       FocusPage, shared
+  focus-active       FocusPage, on start. Local push only, so the companion
+  break-active       FocusPage, on start. window never mirrors these two.
+  thinking           AssistantPage, when a question is sent
+  speaking           AssistantPage, on the first token
+  happy              AssistantPage, when a stream finishes cleanly
+  poked              Companion.tsx
+
+The two `local push only` entries are the one systematic gap in this table: the main window's wolf reacts, the companion does not.
+
+
+================================================================================
+ SECTION 15 — PURE LOGIC
+================================================================================
+
+15.1 The rule
+-------------
+Anything with a branch on user input is a pure function and is tested directly. Anything involving time takes `now` as an argument. Anything touching the network or the database is stubbed. That is why date.ts and timerLogic.ts are testable without a fake clock library.
+
+15.2 utils/date.ts
+------------------
+  toDateKey / toDateTimeKey     format a Date as YYYY-MM-DD / YYYY-MM-DDTHH:MM
+  todayKey()                    today's key
+  isDateKey / isDateTimeKey     strict regex validation, rejects 2026-9-1
+  parseDateKey / parseDateTimeKey
+  addDays / addMonths, startOfMonth / endOfMonth / daysInMonth, isSameDay
+  WEEKDAY_LABELS                Mon-first, ["Mon".."Sun"]
+  monthGrid(view)               ALWAYS 42 cells, Monday-first
+
+monthGrid returning a fixed 42 cells is what makes the calendar grid's height stable across months. A test asserts grid[0] is 2026-08-31 for a September 2026 view, i.e. the Monday before 1 September.
+
+  formatTime     slice(11, 16)
+  formatDayShort "28 Sep"
+  formatDayLong  "Mon 28 Sep"
+  relativeDay    "Today" | "Tomorrow" | "Yesterday" | "<n>d overdue" | "Wed"
+                 | "28 Sep"
+  formatClock    MM:SS with unbounded minutes, so 1500 seconds renders "25:00"
+  formatDuration "1h 15m" or "25m"
+  formatInstant / nowInstant
+
+15.3 utils/taskLogic.ts
+-----------------------
+  filterAndSort(tasks, filter, sort, today)
+  matchesFilter(task, filter, today)
+  sortTasks(tasks, sort)      open-first for every sort
+  toView(task, today)         { task, dueLabel, priorityLabel, overdue, dueToday }
+  PRIORITIES                  [0, 1, 2, 3]
+  prioritySymbol              0→▁ 1→▂ 2→▃ 3→█
+  progressLabel               "3/8" — exported but unused by any page
+  dayPressure({dueToday, overdue}) -> a WolfSignal
+  daysBetween(a, b)           signed
+
+sortTasks puts a null due date last via a compareNullableDate helper, the client-side mirror of the SQL `due_date IS NULL ASC` trick. dayPressure is the bridge between the task list and the wolf: overdue > 0 gives "busy"; dueToday === 0 gives "all-clear"; dueToday <= 2 gives "default"; anything else gives "busy".
+
+15.4 utils/timerLogic.ts
+-----------------------
+TimerSnapshot is { phase, status, remaining, total, completedInSet, startedAt, accumulatedMs }. Functions: phaseSeconds (idle falls back to focusMinutes); initialSnapshot (IDLE, remaining = focus duration); start, pause, reset, tick; nextPhaseAfter (long break when completedInSet + 1 >= sessionsBeforeLongBreak, and the set counter resets to 0 on a long break); advance (next phase, already running); skip (next phase but paused, startedAt null); isRunning (FOCUSING or BREAK); progressFraction (remaining / total); describe ("Ready when you are." | "Focusing." | "On a break." | "Paused." | "Phase complete."); untilLongBreak; focusSummary(stats) ("No sessions yet today." or "N session(s) · M min focused today."); and TIMER_STATUSES, exported but never imported.
+
+start preserves accumulatedMs only when resuming from PAUSED, which is what makes pause/resume drift-free. The test suite pins the arithmetic: pausing at +10s, resuming at +20s and ticking at +50s yields remaining 1460, not 1440.
+================================================================================
+ SECTION 16 — THE WOLF SPRITE PIPELINE
+================================================================================
+
+16.1 The data
+-------------
+src/assets/wolf/wolf-pixels.json holds the single source of truth: name "wolf", width 28, height 28, a palette of {".": null, "K": "#1A1A1A", "B": "#4A5056", "C": "#8C939A", "L": "#D8DCDE", "W": "#F2F0E8", "P": "#E27D85", "R": "#802A30", "T": "#7FA9C4"}, and 28 rows of 28 characters.
+
+The authoring note in the file is worth quoting because it encodes two hard constraints:
+
+  Original artwork created for the Wolf project. No third-party sprites are used.
+  Rows 0-1 are deliberate headroom so the ear, sparkle and breath animations have
+  room to move without clipping. Every row is mirrored about the 13.5 column
+  axis, so a shape spanning columns L..R satisfies L + R = 27.
+
+"." is transparent. README and docs/ARCHITECTURE.md both say 24x26; it is 28x28, so 784 cells, not 624.
+
+16.2 Named colours
+-----------------
+sprites.ts maps friendly names onto palette keys and requireColor() throws at module load if a key is missing: outline->K, fur->B, furLight->C, light->L, white->W, pink->P, cavity->R, tear->T.
+
+16.3 Anatomy constants
+----------------------
+Every pose is expressed as a transformation of these coordinates rather than a hand-drawn second matrix:
+
+  EAR_TOP / EAR_BOTTOM        2 / 4
+  EAR_LEFT_COL / RIGHT_COL    8 / 16   (4 columns wide each)
+  HEAD_TOP / HEAD_BOTTOM      5 / 18   (head plus muzzle)
+  EYE_ROW                     10
+  EYE_LEFT_COL / RIGHT_COL    9 / 15   (3-row band, 4 columns per eye)
+  SNOUT_TOP / SNOUT_BOTTOM    13 / 18
+  MOUTH_ROW / MOUTH_COL       17 / 12
+  CHEST                       [[22,10,17],[23,11,16],[24,12,15],[25,13,14]]
+  JAW                         BASE[18], saved so the neck reconnects after a move
+  MOUTH_CLOSED                "KKKK"
+
+There is an import-time guard: if BASE[17].slice(12,16) is not "KKKK" the module throws, so an edit to the base matrix cannot silently break the mouth anchor.
+
+16.4 Primitives
+---------------
+  clone / assertSameShape / rowWidth
+  swap(matrix, from, to)
+  stamp(matrix, row, col, text)      writes "." as a real erase
+  shiftRows(matrix, fromRow, toRow, dx)
+  shiftRowsVertical(matrix, fromRow, toRow, dy)   blanks source and destination
+  shiftRegionH(matrix, fromRow, toRow, fromCol, toCol, dx)
+  shiftVertical(matrix, dy)          whole-sprite move into a blank canvas
+  scaleBand(matrix, topRow, bottomRow, factor, anchorRow)
+  overlay(base, overlayMatrix, row, col)    non-"." overlay pixels win
+  mirrorRow
+
+assertSameShape throws "sprite row {i} is {len} wide, expected {width}" on the first ragged row, which is how a malformed edit fails immediately.
+
+16.5 Eye patches and overlay art
+---------------------------------
+All six eye patches are three rows applied at (10, 9) and mirrored to (10, 15):
+
+  EYE_HAPPY  ".KK."  "KBBK" "BBBB"
+  EYE_BLINK   "BBBB" "KKKK" "BBBB"
+  EYE_ARC     "KBBK" "BKKB"          two rows only; a third would hit the
+                                      forehead stripe
+  EYE_DOT     "BKKB" "BKKB" "BBBB"
+  EYE_TIGHT   "KKKK" "BBBB" "BBBB"
+  EYE_FLAT    "KKKK" "KKKK" "BBBB"
+
+Overlay art: SPARKLE 3x3 for celebration; HEART 3x3 for winking; HEART_TAIL one pink pixel standing in for the faded tail; BREATH three rows of white mirrored to both sides for huffing; and SOUND, documented as 3x3 but actually 3 rows x 2 columns.
+
+16.6 Pose builders
+-----------------
+  raiseHead / raiseHeadOnly / lowerHead, raiseSnout
+  drawChest(dy, grow)             repaints each CHEST span with "W"
+  perkEar(side, amount)
+  moveEar(side, dy)               extracts, blanks source and destination,
+                                  re-stamps non-"." pixels
+  liftEars(dy)                    both ears as one symmetric block
+  widenMuzzle(by)                 new outer columns become "K"
+
+16.7 States and frames
+----------------------
+Nine states, 32 generated frames total, every frame the full 28x28 canvas:
+
+  idle        4  [rest, head up 1px, chest drawn wider, rest]
+  blink       3  [EYE_BLINK, EYE_ARC, EYE_HAPPY]
+  speaking    4  [eyes, slight open, wide open, grin]
+  listening   4  [ear cocked, ear twitch, head tilt, tilt + SOUND]
+  happy       4  [sparkled, perked, sparkle, tight]
+  winking     3  [wink + HEART, squeeze + HEART, happy eyes + HEART_TAIL]
+  huffing     3  [flat brows, steam at 10, steam at 9]
+  puffing     3  [wide cheeks, lowered, lowered + BREATH, + SPARKLE x2]
+  sad         4  a tear stamped at rows 12, 13, 14, 15 in turn
+
+The sad tear slides exactly one row per frame. Mouth cavity ("R") appears only in `happy` and `speaking`, and the tear ("T") only in `sad` — both asserted across all nine states so a future pose cannot accidentally leak a mouth or a tear. The framesFor switch has no default arm; exhaustiveness over WolfState is what satisfies the compiler.
+
+16.8 Rendering
+--------------
+toRuns walks each row emitting maximal horizontal runs, pushing a run only when the palette maps the character to something truthy. So "." contributes nothing, and a frame collapses from 784 pixels to roughly forty rectangles.
+
+validateSprite() returns a list of human-readable problems (wrong row count, a row of the wrong width, an unknown character, a bad frame) and regenerates all 32 frames to check them. The test suite asserts it returns [].
+
+WOLF_STATE_LABELS supplies the accessible name for each state: "Wolf is idling", "Wolf blinks", "Wolf is speaking", "Wolf is listening", "Wolf is happy", "Wolf winks", "Wolf is huffing", "Wolf is puffing", "Wolf is sad".
+
+16.9 Icon generation
+---------------------
+scripts/generate-icons.mjs reads the same JSON and writes 14 PNGs: 8 Tauri icons, 3 tray bitmaps (32, 22, 16) and 3 favicons. It draws a circular badge — #1C2024 ground with a #8C939A ring — with the wolf's head inside, and remaps the palette because the artwork is authored for a light background: K->#F2F0E8, B->#6E767C, C->#4A5056, L->#8C939A, W->#F2F0E8, P->#E27D85, R->#802A30, T->#7FA9C4.
+
+The crop is row 2, col 4, 19x19. Anything 32px or smaller gets a simplified mark, because "at those sizes the full 19x19 head has less than one pixel per sprite cell." The script has no image dependencies — it writes PNG chunks by hand.
+
+scripts/check-sprite.mjs enforces the 24-32 size range, row widths, palette membership, mirror symmetry about axis 13.5, the presence of eye rows 10 and 11, a mouth on row 17, and at least two rows of headroom. Its success line is:
+
+  sprite ok: 28x28, symmetric, N rows of headroom
+
+
+================================================================================
+ SECTION 17 — SIGNALS AND ANIMATION
+================================================================================
+
+17.1 Signals versus states
+--------------------------
+A WolfSignal is a coarse application event. A WolfState is a pose. resolveState maps between them:
+
+  offline            -> sad          checked first; a failure shows through
+  speaking           -> speaking
+  thinking           -> puffing
+  focus-active       -> listening
+  busy               -> listening
+  focus-paused       -> huffing
+  break-active       -> happy
+  task-completed     -> happy
+  task-created       -> happy
+  all-clear          -> happy
+  poked              -> winking
+  sleep, default,    -> idle
+  anything else
+
+WOLF_SIGNALS is a readonly tuple declared with `as const satisfies readonly WolfSignal[]`, so the array and the union type cannot drift apart. isWolfSignal(value) is a runtime membership test, which exists because the signal payload crosses the window boundary as untyped JSON. No signal resolves to `blink`: blinking is timer-injected only.
+
+17.2 Frame timings and time to live
+------------------------------------
+FRAME_DURATIONS holds a pattern per state and frameDurations cycles it, so a three-entry pattern over four frames repeats its last value:
+
+  idle        [300, 350, 200, 350]   1200 ms with a 200 ms hold on the inflated
+                                     frame
+  blink       [100, 100, 100]
+  speaking    [120, 120, 120, 120]   fast, so speech reads as chatter
+  listening   [450, 200, 450]        patient, not twitchy
+  happy       [200, 200, 300, 300]   sparkles pop, the settled pose does not
+  winking     [150, 400, 150]        the squeeze lingers
+  huffing     [200, 150, 300]
+  puffing     [300, 300, 400]
+  sad         [500, 500, 500, 500]   the slowest; sad should not feel busy
+
+  TTL   idle, blink   null — sticky, never falls back
+        speaking      30_000      listening   20_000     puffing   20_000
+        huffing        8_000      happy        6_000     winking    2_000
+
+There is a regression test for a real bug here: `listening` was once missing from a duplicated TTL table, which left the pose stuck until the companion window was closed. The test now asserts every non-sticky state has a numeric TTL.
+
+17.3 The hook
+-------------
+useWolfFrame(state) returns { frame, index, count, label }. A state change is handled during render, not in an effect: set the rendered state, reset the index to 0, clear any blink. The frame timer self-reschedules with the per-frame duration, defaulting to DEFAULT_STEP_MS = 120. A blink timer runs only while the state is idle; the next blink is scheduled with nextBlinkDelay() between BLINK_MIN_MS = 3000 and BLINK_MAX_MS = 6000, using an injectable RNG so the tests can pin it. Blink frames advance at a hardcoded 100 ms each rather than reading FRAME_DURATIONS.blink, a small duplication risk that happens to agree today.
+
+The interval that expires poses is not in the hook; App.tsx and Companion.tsx each run setInterval(reevaluate, 1000).
+
+17.4 Signals reaching the companion
+-----------------------------------
+The main window emits "wolf://signal" with the bare signal string. Companion.tsx listens, validates with isWolfSignal, and calls push rather than pushShared so a received signal cannot echo back. Poking the companion broadcasts "poked", so the main window's wolf reacts too.
+================================================================================
+ SECTION 18 — STYLES AND DESIGN TOKENS
+================================================================================
+
+18.1 The four files
+------------------
+  theme.css       custom properties: the sprite's eight colours, promoted
+  pixel.css       hard-edged primitives: borders, shadows, notches, bars
+  animations.css  keyframes and the reduced-motion override
+  globals.css     resets, the shell grid, and the shared component classes
+
+globals.css @imports the other three at the top, so a component only ever imports globals.css. Total 1,059 lines across the four files. There is no tokens.css.
+
+18.2 One palette, not four
+--------------------------
+theme.css is explicit that Wolf has a single cohesive theme, and its header comment explains why: every colour is taken from the wolf sprite's own eight colours (see wolf-pixels.json) so the character and the interface cannot drift apart — the sprite's fur is the interface's outline, its cream is the interface's text, and its pink cheek is the interface's accent.
+
+Six canonical variables carry the sprite's hex values verbatim:
+
+  --bg-primary    #1c2024      --bg-secondary  #2a2f35
+  --border-color  #4a5056      --accent-color  #d8dcde
+  --text-primary  #f2f0e8      --accent-pink   #e27d85
+
+Six more name the same eight colours semantically, completing the coverage:
+
+  --outline       #1a1a1a   K     --fur-light    #d8dcde   L
+  --fur-mid       #8c939a   C     --fur-cream   #f2f0e8   W
+  --muzzle-dark   #802a30   R     --breath-blue #7fa9c4   T
+
+A final block of aliases exists because several hundred var() call sites already use them: --bg, --bg-raised, --bg-sunken (#14171a), --panel, --panel-alt, --border, --border-strong, --text, --text-dim, --text-faint, --primary, --primary-dim, --secondary, --accent (var(--accent-pink)), --success (the blue), --success-dim, --warning (the cream), --warning-dim, --danger (also the pink), --danger-dim. 38 custom properties in total.
+
+Because the sprite has no green or amber, the status colours are drawn from what it does have: blue reads as "fine", cream as "attention", pink as "problem". So --danger and --accent are the same pink, and --warning is the same cream.
+
+18.3 The theme attribute is honoured but inert
+---------------------------------------------
+  [data-theme] { color-scheme: dark; }
+
+That is the entire rule. App.tsx writes settings.theme onto documentElement.dataset.theme and settingsStore defaults it to "midnight", but no selector varies the palette by theme name. The comment above the rule says it plainly: "Honoured so persisted settings from an earlier build still apply cleanly, but no longer selects a different palette: the theme is deliberately cohesive." This is drift in the opposite direction to the sprite: the setting exists, the UI exposes it, and changing it changes nothing. See 21.2.
+
+18.4 Shape, depth and typography
+--------------------------------
+  --pixel           2px     every border and shadow offset is 2px
+  --radius          0px     nothing in this interface is round
+  --shadow          #000000
+  --shadow-offset   3px
+  --shadow-hard     3px 3px 0 0 #000000
+
+The geometry is commented: "A raised surface throws a 3px black shadow down and to the right; pressing it moves it exactly that far and drops the shadow, which is what makes the press read as a depression." So :active translates by --shadow-offset and loses its box-shadow: the press is a real depression, not a colour change.
+
+Silkscreen is bundled as two @font-face rules (Regular and Bold), not fetched, so the interface renders identically offline. font-display: block is deliberate: "a swap would show a smooth monospace frame first, which breaks the illusion far more noticeably than a brief blank." Silkscreen has no bold or italic cut, so both weights map to the bold face and there is no italic at all. body sets 13px / 1.5, -webkit-font-smoothing: none and font-smooth: never, because anti-aliased curves would undercut the pixel look. Headings are uppercase, 1rem, letter-spaced 0.08em, weight 400.
+
+18.5 Layout
+-----------
+  .app-shell   grid, --header-h (44px) rows and --sidebar-w (176px) columns
+
+  grid-template-areas:
+    "titlebar titlebar"
+    "sidebar  main"
+
+html, body and #root are all height: 100%. body has overflow: hidden; scrolling happens in .main.scroll-y, not the document. At max-width: 820px --sidebar-w drops to 56px, hiding the labels and leaving the icon rail; a second 820px block stacks the grid in the tasks and calendar pages. Two media queries in globals.css, and one more in animations.css.
+
+18.6 The companion window
+-------------------------
+  body[data-window="companion"] { background: transparent; overflow: hidden;
+  user-select: none; cursor: grab; }
+
+and :active switches the cursor to grabbing. The background rule is not cosmetic: the window is transparent, so any opaque body background would render as a visible rectangle over the desktop. user-select: none is what makes the window draggable without selecting the sprite on the first click. companion.tsx sets data-window="companion" on both documentElement and body before React mounts.
+
+18.7 Pixel primitives
+--------------------
+pixel.css is a small utility layer: .pixel-border (2px border, an inset "bevelled" shadow and an outer one), .pixel-border--raised (stronger border colour), .pixel-border--sunken (inverted, no outer shadow), .pixel-inset, .pixel-outset, .pixel-corners (::before/::after carve 2px notches at two corners, the classic 8-bit panel shape, pointer-events: none), .pixel-text (pixel font, 0.06em letter-spacing, uppercase), .pixel-dot (a 2px square of currentColor), .pixelated (image-rendering: pixelated + crisp-edges), .pixel-sprite (shape-rendering: crispEdges), .pixel-bar (a grid of equal columns) and .pixel-bar__cell (a segment; [data-on="true"] fills with --accent).
+
+The notches sit at calc(var(--pixel) * -1), just outside the box, and are painted in --bg so they read as cut-outs against the panel behind.
+
+18.8 Every animation is steps()
+-------------------------------
+animations.css defines eight keyframe blocks — wolf-step, pixel-fade-in, pixel-pop-in, pixel-slide-in, pixel-pulse, pixel-blink-dot, pixel-shake, and pixel-marquee, which nothing uses — and seven utility classes. Every one uses steps() timing, never a smooth curve, because a smooth fade is the single easiest way to break the illusion:
+
+  .anim-fade-in    pixel-fade-in    160ms steps(3, end) both
+  .anim-pop-in     pixel-pop-in     200ms steps(4, end) both   scale 0.9 -> 1
+  .anim-slide-in   pixel-slide-in   180ms steps(3, end) both   translateX 6px
+  .anim-pulse      pixel-pulse      1.4s  steps(2, end) infinite
+  .anim-blink-dot  pixel-blink-dot  1.2s  steps(2, end) infinite
+  .anim-shake      pixel-shake      320ms steps(2, end) 1
+  .wolf-sprite     wolf-step        1.2s  steps(2, end) infinite
+
+The file's own rule: "transforms and opacity only, short durations, and the wolf loop is driven by React state rather than a continuous rAF render." Nothing animates a layout property, so nothing triggers reflow. .wolf-sprite[data-state="sleeping"] and [data-state="break"] halve the step rate to 2.4s, so a resting wolf breathes slower than a working one.
+
+18.9 Focus and motion
+---------------------
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+Focus is never suppressed, and --focus is the sprite's pink. The single prefers-reduced-motion block in the codebase is in animations.css, and it is a blanket override on *, ::before and ::after rather than a per-rule opt-out: animation-duration 0.001ms, animation-iteration-count 1, transition-duration 0.001ms, all !important. That is the correct approach at this size: one block, and a new animation cannot forget it.
+
+18.10 How wrong a light theme could get
+---------------------------------------
+The dark scheme is not optional. globals.css sets color-scheme: dark on :root and again on [data-theme], and every semantic colour is authored against a near-black background, so the palette is load-bearing for the 2px bevel and the hard drop shadow. Anyone adding a light theme has to change the palette level, not override a handful of variables.
+================================================================================
+ SECTION 19 — TESTS
+================================================================================
+
+19.1 What exists
+----------------
+  98 Vitest cases across 6 files
+  67 Rust tests in #[cfg(test)] modules inside src-tauri/src
+
+Neither suite needs a display, a running Ollama daemon, or a database file. The Rust tests run against `Database::open_in_memory()`, so migrations execute for real on every run.
+
+19.2 The six frontend files
+--------------------------
+  src/assets/wolf/sprites.test.ts            41 cases
+  src/utils/timerLogic.test.ts               17
+  src/services/ollama/OllamaClient.test.ts   14
+  src/utils/taskLogic.test.ts                12
+  src/utils/date.test.ts                     11
+  src/services/desktop/ipcContract.test.ts    3
+
+Every one of those 98 cases is pure logic or a file parse. There are no React component tests, no jsdom rendering tests, no E2E harness, no tauri-driver, no WebDriver and no screenshot comparison. Every JSX component in the tree is exercised only by hand.
+
+19.3 sprites.test.ts
+--------------------
+Eight describe blocks: artwork (a rectangular grid of the declared size, only palette characters, two clear rows of headroom, mirror-symmetric about the 13.5 axis); transforms (swap preserves shape, stamp writes in place, shiftRows loses no pixels, shiftVertical keeps the canvas size, scaleBand leaves the rest alone, overlay only writes non-"." pixels); frames (at least two frames per state, every frame 28x28, every state's loop matching its frames); rendering (toRuns merges horizontal runs and covers every pixel exactly once, runs stay inside the canvas); timings (every state has an interval, the idle cycle is 1200 ms with a 200 ms hold, each blink frame is 100 ms, durations align to the frames actually produced); signals (every signal resolves to a known state, a failure shows through, rest when nothing is happening); validation (every declared signal accepted, anything else rejected, the runtime list and the type in step); and time to live (every transient pose expires, resting poses do not, TTLs agree with the declared TIMINGS).
+
+Three of these are regression tests for bugs that shipped. "Keeps every frame the same size as the base sprite" and "gives each state a loop that matches its frames" guard a blank-row bug: a vertical shift that returned a shorter matrix produced a silently collapsed animation. "Shows a mouth cavity while speaking and closes it again" and "opens the mouth for the happy pose only" guard mouth "R" leaking into the wrong poses. "Expires every transient pose so the wolf settles on its own" is the regression test for the missing-`listening`-TTL bug in section 17.
+
+19.4 ipcContract.test.ts
+------------------------
+This is the most interesting test in the repository, and all three cases are the whole file's purpose; the rest is infrastructure.
+
+Nothing in the toolchain checks that a command name or an argument key used in TypeScript still exists in Rust. Tauri resolves both at runtime, so a typo or a rename is a production-only failure. The test closes that gap by parsing both sides and comparing them.
+
+  invokedCommands()      walks src/, regexes every
+                         invoke(?:<...>)?("name", { key: … }) call, and collects
+                         the command, its argument keys and its file
+  registeredCommands()   extracts the generate_handler![…] block from lib.rs
+  commandSignature()     greps each file in src-tauri/src/commands for
+                         pub (async )?fn NAME (…), then filters out `&str`
+                         params and anything named app, state, window or channel
+                         — the Tauri-injected values — plus `self`
+  toCamelCase()          converts snake_case to camelCase, because Tauri
+                         camel-cases arguments on the JS side
+
+The three assertions: enough calls and registrations were found to be worth checking (>40 each, so the parser cannot silently match nothing); every invoked command is registered in Rust; and every argument key is one the Rust command actually accepts, reporting the accepted set on failure.
+
+The known limitation is that it matches parameter names, so renaming a parameter breaks the test rather than silently breaking the wire. That is the right trade: a false failure costs a one-word fix, a false pass costs a production bug.
+
+19.5 OllamaClient.test.ts
+-------------------------
+  configuration   URL and model are normalised; a blank URL falls back to the
+                  local default; update() applies changes
+  status          ready when the model is installed; a transport failure becomes
+                  an offline status rather than a thrown error; overrides pass
+                  through to the transport
+  asking          refuses an empty question; returns the model's answer; wraps
+                  transport failures in a WolfAppError; streams tokens and fills
+                  in the model on the done event
+  status copy     describeStatus describes all four states; says "checking"
+                  before the first probe; marks a stopped daemon offline
+
+Everything uses a hand-written fake transport, so no HTTP occurs. The interesting case is "keeps delivering tokens that arrive after the ack resolves", which pins the contract that askStream's promise resolves when the native side accepts the request, not when the stream ends.
+
+19.6 The utils tests
+--------------------
+timerLogic.test.ts (17) is the largest: phases to seconds, idle starting with a full block, idle -> focusing, counting down, refusing to tick while paused, resuming exactly where it was paused, completing at zero, resetting, a short break after one focus block, a long break on the fourth session with the counter reset, returning to focus after a break, advance starting running, skip leaving the phase paused, counting down to the long break, progress as a fraction, describe() for every status, and the day summary. "Resumes from where it was paused" is the drift-free invariant from section 15.
+
+taskLogic.test.ts (12) covers each filter branch (including "treats the due date as a calendar day, not a timestamp"), open-before-complete ordering, dateless tasks last, priority descending, filter+sort in one pass, overdue and due-today flags, the "No date" label, all four dayPressure branches, the priority symbols, and daysBetween.
+
+date.test.ts (11) covers key formatting and validation (rejecting impossible dates, accepting leap days), datetime validation, addDays across a month boundary, the Monday-first 6x7 grid, the relativeDay branches, formatClock and formatDuration, and slicing a time out of a naive datetime.
+
+19.7 Rust coverage
+------------------
+models/settings.rs tests defaults_are_sane, sanitizing_clamps_and_repairs_values (including NaN scale and a whitespace URL), sanitizing_trims_trailing_slash and round_trips_through_json. database/settings.rs tests defaults_when_empty, round_trip, values_are_sanitised_on_save and corrupt_blob_falls_back. Each other repository module follows the same pattern: create, read, update, delete, filters, uniqueness constraints, ON DELETE CASCADE, and the validation rules in 9.4. database/habits.rs adds current_streak and longest_streak across daily, weekdays and weekly frequencies, including a missed day.
+
+ai/mod.rs tests classifies_common_questions across the 8 intents, that the context reports the empty state honestly, that a today question includes due tasks, an overdue question excludes on-time work, an upcoming question includes events, a habit question includes streaks and a focus question includes counts, that context_stays_within_the_total_budget, and that the system prompt forbids inventing data.
+
+ollama/client.rs tests that the chat body carries the system prompt, the context block and the options; that a blank model is rejected before any request; resolve_model by exact name, by family prefix and unknown; /api/tags parsing including an empty list; the legacy `response` field; a token chunk; a frame with no content; and snake_case state serialisation. error.rs tests that kind plus a human message serialises and that not_found reads as "Task not found." tray/mod.rs tests action serialisation. notifications/mod.rs tests that a missing service, a refused request and a D-Bus transport failure are each explained in prose, that an unknown failure stays generic, and that the builder marks urgent. database/test_support.rs provides the in-memory Database with migrations applied.
+
+19.8 What is not tested
+-----------------------
+No IPC behaviour test beyond the name and arity contract: no test asserts that create_task actually persists a row through the command layer, because that would need a Tauri host. No test covers the tray event payloads, the companion window lifecycle, the close-to-tray policy, or the reminder sweep's clock arithmetic — that logic lives in commands/calendar.rs and is exercised only by hand. No React component test. No migration test against a database written by a previous version, only fresh in-memory application.
+
+19.9 Running everything
+-----------------------
+  npm test            Vitest, 98 cases, about 5s
+  npm run lint        ESLint with --max-warnings 0
+  npm run typecheck   tsc --noEmit
+  npm run rust:test   cargo test, 67 cases
+  npm run verify      typecheck + lint + test + rust:check + rust:test
+
+Note what verify does not do: it does not run cargo fmt, clippy, or a build. Those are separate scripts (rust:fmt, rust:clippy, build). Since npm run lint already runs with --max-warnings 0, verify is a real gate, but it is not the whole gate.
+
+19.10 Test style
+----------------
+Worth describing because it explains what the suite can and cannot cover.
+
+There is no setup file and no test framework: `globals: false` means every file imports describe, it and expect from vitest explicitly, which makes the dependencies of each test visible. `restoreMocks: true` resets spies between tests automatically, so no test cleans up after itself. `isolate: false` is justified in a comment in vite.config.ts — "Wolf's tests are pure logic and touch no shared state, so one jsdom per worker is enough" — which is true today and would stop being true the moment someone writes a component test that mutates a store.
+
+Naming carries the intent. "keeps every frame the same size as the base sprite", "expires every transient pose so the wolf settles on its own", "treats the due date as a calendar day, not a timestamp" — a failing test says what broke without opening the file. Assertions state the invariant, not the implementation: `expect(remaining).toBe(1460)` rather than a snapshot of the whole snapshot object.
+
+Nothing is mocked that can be real. There is no fake clock: `now` is passed in, so time is a parameter. There is no mock database: the Rust tests run actual migrations against actual SQLite in memory. There is no mock fetch: the Ollama tests use a hand-written fake transport implementing five methods, which is a stub at a boundary the code owns rather than a mock of a third party's internals.
+
+The consequence is visible in 19.8. Because nothing is stubbed, the 165 tests are trustworthy and the boundary above the services is uncovered. That is a good trade for this codebase, and it would need revisiting before adding any UI test.
+================================================================================
+ SECTION 20 — NUMBERS WORTH MEMORISING
+================================================================================
+
+20.1 The counts
+----------------
+  Rust source files                  34      5,434 lines
+  TS / TSX files (incl. 6 tests)     55      8,793 lines
+  CSS files                           4      1,059 lines
+  SQL migrations                      2         77 lines
+  Shell and Node scripts              5        569 lines
+  Markdown (README + 2 docs)          3        344 lines
+  Tauri commands                     49      47 of them invoked
+  Rust tests                         67      all passing
+  Vitest cases                       98      in 6 files, all passing
+  Zustand stores                      8
+  Frontend routes                     7      one page each, 7 pages
+  Sprite states                       9      32 generated frames
+  Settings fields                    20      duplicated in Rust and TS
+  Generated PNGs                     14
+  Themes                              1      one palette, see 18.2
+
+20.2 The largest files
+----------------------
+  src/assets/wolf/sprites.ts              802
+  src/styles/globals.css                  728
+  src-tauri/src/ollama/client.rs          638
+  src-tauri/src/database/habits.rs        511
+  src-tauri/src/database/calendar.rs      484
+  src/pages/Settings/SettingsPage.tsx     469
+  src-tauri/src/ai/mod.rs                 422
+  src/pages/Assistant/AssistantPage.tsx   391
+  src/types/index.ts                      353
+  src/assets/wolf/sprites.test.ts         346
+
+sprites.ts is the largest file in the project because it holds both the transform primitives and all nine poses. It is
+cohesive rather than sprawling: every pose is a transformation of one 28-row base matrix, so the artwork exists once.
+
+20.3 How to re-derive these
+---------------------------
+  find src-tauri/src -name '*.rs' | wc -l
+  find src-tauri/src -name '*.rs' -exec cat {} + | wc -l
+  find src \( -name '*.ts' -o -name '*.tsx' \) | wc -l
+  grep -c '#\[tauri::command\]' src-tauri/src/commands/*.rs
+  npm test
+  cargo test --manifest-path src-tauri/Cargo.toml
+
+The command count is 49 in the current registration list and no other number matters: it was 40 in an earlier revision
+and 51 in another, and only the list in lib.rs is correct.
+
+
+================================================================================
+ SECTION 21 — GAPS, DEAD CODE AND DOCUMENTATION DRIFT
+================================================================================
+
+Everything here was checked against the current tree rather than inferred. A description that only flatters the code
+is marketing.
+
+21.1 The sprite dimension is wrong in two documents
+---------------------------------------------------
+README.md line 26 and docs/ARCHITECTURE.md line 74 both say the wolf is a 24x26 character matrix. wolf-pixels.json
+says width 28, height 28, and 784 cells. Every sprite test, the mirror-symmetry axis (13.5), the two rows of headroom
+and the icon crop all assume 28. This is the most expensive piece of drift in the repository, because it looks
+authoritative and is easy to act on.
+
+21.2 The theme setting does nothing
+-----------------------------------
+Settings.theme defaults to "midnight", is persisted, and is exposed in SettingsPage. The only CSS that reads it is
+`[data-theme] { color-scheme: dark }`, which does not change any colour. The code comment says the palette is
+"deliberately cohesive" and the setting is honoured only so older saved settings still load. That is defensible, but
+it means the UI offers a choice with no outcome, and tests use palette-looking values such as "dusk" that mean
+nothing.
+
+21.3 Two registered commands are never called
+---------------------------------------------
+  assistant_context      returns { query, intent, context, system_prompt }
+  assistant_suggestions  returns six canned question strings
+
+Nothing in src/ invokes either. The Assistant page keeps its own local SUGGESTIONS array, and builds its context implicitly by letting OllamaClient compose the prompt. The context-assembly code in ai/mod.rs therefore runs only under its own unit tests, not in the application. This is the most consequential gap in the list: the assistant's grounding logic is the most carefully written code in the backend, and it is not wired to the screen that would use it.
+
+21.4 The reminder sweep has no caller
+--------------------------------------
+due_event_reminders and mark_event_notified are implemented in Rust, exposed in calendarService as dueReminders and markNotified, and never invoked from any page or store. The Rust command comment says it is "called by the frontend scheduler"; no such scheduler exists. App.tsx's single interval is the wolf's one-second reevaluate, not a reminder poll, and state.rs's SchedulerHandle is a type alias no code uses.
+
+So event reminders are configurable in the UI (eventRemindersEnabled, reminderMinutes on each event), are stored, and are shown as a label on the event ("10m before") — and are never delivered. habitRemindersEnabled is the same story, with MESSAGES.habitDue defined and unused.
+
+21.5 Structural weaknesses
+---------------------------
+  No Ollama host allowlist. The README claims the client "refuses to talk to
+    anything but http://localhost:11434 or http://127.0.0.1:11434". There is no
+    such check in client.rs: the URL comes from settings, redirects are disabled
+    but nothing constrains the host, and the request goes wherever the user
+    configured. For a localhost-only design that is a real gap.
+  No cancellation for Ollama streams. The Assistant page's Stop button detaches
+    the listener; the native request runs to completion regardless.
+  focusStore.tick is interval-driven, so a throttled background tab drifts from
+    wall-clock time. The 250 ms tick makes this rare but not impossible.
+  Frontend settings writes send a full Settings, not a SettingsPatch. Field-level
+    atomicity exists in Rust (apply_patch) but the frontend never exercises it,
+    because it always sends everything.
+  Settings are one JSON blob, so an older binary silently drops fields a newer one
+    added.
+  Notifications availability is optimistic: a static AtomicBool that starts true
+    and only flips false after a real failure, and is never re-probed.
+
+21.6 Dead code worth removing
+------------------------------
+  timerLogic.TIMER_STATUSES        exported, never imported
+  taskLogic.progressLabel           exported, never rendered
+  ollamaStore.lastCheckedAt        written, never read
+  pixel-marquee @keyframes          defined, no utility class uses it
+  SharedState<'r> in state.rs       an alias nothing references
+  SchedulerHandle in state.rs       see 21.4
+  assets/icons/, assets/sounds/     empty directories
+  tempfile in Cargo.toml             a dev-dependency, never used
+  TrayAction::ToggleCompanion       has no menu id, so it is unreachable
+  target_per_period                 validated and stored, never read
+  MESSAGES.eventSoon / .taskOverdue / .ollamaOffline / .habitDue
+                                     four of the six notification bodies have
+                                     no caller; see 12.5
+
+21.7 One systematic gap in the signal bus
+-----------------------------------------
+FocusPage pushes focus-active and break-active with the local push() rather than pushShared(), so the companion
+window's wolf never mirrors them. focus-paused and all-clear from the same page are shared correctly. Every other
+signal source either broadcasts or is local-only by intent (HomePage's pressure effect). See 14.6.
+
+21.8 Missing tests
+------------------
+No component tests at all — the 98 cases are pure logic plus one file-parsing contract test. No test of the reminder
+sweep's clock arithmetic. No test of the tray payloads beyond one serde assertion. No migration test against a
+database written by a previous version. No test that the two DEFAULT_SETTINGS copies (models/settings.rs and
+stores/settingsStore.ts) agree; a mismatch would surface only at runtime, and only for whichever field the user
+changes first.
+
+The largest untested surface is the 49-command boundary. ipcContract.test.ts verifies names and parameter arities
+statically, which is genuinely useful, but nothing verifies behaviour: that create_task persists a row, that
+set_task_completed writes completed_at, that save_settings sanitises. Everything below that line is well covered;
+everything at it is checked by hand.
+
+21.9 One real timezone bug, and one mislabelled column
+------------------------------------------------------
+The focus statistics queries compare substr(started_at, 1, 10) — a UTC date — against a local date string supplied by
+the caller (see 9.9). Sessions near midnight can be counted on the wrong day, and the focus_stats test cannot catch it
+because it uses dates far from any boundary.
+
+habit_completions.completed_at is named like an instant and the surrounding migration header implies it is one, but
+complete_habit writes normalize_date(date), a plain YYYY-MM-DD. That is the correct choice for streak maths, and
+the streaks are right because of it. It is the naming and the header comment that are wrong, which is the more dangerous
+kind of drift: a future writer who reads the column name and starts parsing it as a timestamp will introduce a real
+bug.
+
+21.10 What is genuinely well built
+-----------------------------------
+The list above is long enough that it is easy to conclude the project is sloppy. It is not. Several decisions here are
+better than most codebases of this size manage, and a new contributor should not undo them while fixing the items
+above.
+
+The pure-function discipline is the strongest of them. The timer, the date helpers, the task filters, the intent
+classifier, the context assembler, the streak maths and the entire sprite pipeline are all functions of their arguments
+with no clock, no network and no filesystem. That is why 165 tests run in about five seconds with no setup file, and it
+is why three of the regression tests in section 19 exist at all.
+
+The error layer is the second. A hand-written two-field serialisation, a `kind` that callers branch on instead of a
+message, and error text written for the person reading it — "That month does not exist.", "A task needs a title.",
+"Ollama is not running at {url}. Start it with `ollama serve`." — is a design, not an accident. It also makes the
+frontend's WolfAppError a real translation layer rather than a string pass-through.
+
+The third is honesty in the design. SettingsPatch exists to solve a real two-window race and is commented at the site;
+the wolf's TIME_TO_LIVE table is a deliberate second copy, and the test that every transient pose expires is the
+regression guard for the bug that copy once caused. Where the author made a trade-off, the trade-off is written down
+next to it.
+
+The fourth is the ipcContract test. Parsing both sides of a boundary that neither the type system nor the compiler
+checks is unusual foresight for a 20-script project, and it is why 49 commands and 47 call sites have not drifted.
+
+The gaps in 21.3 and 21.4 share one shape: careful logic with no caller. The missing pieces are wiring, not design,
+and both are smaller than they look — a store action and an interval.
+================================================================================
+ APPENDIX A — COMMAND REFERENCE
+================================================================================
+
+All 49 registered commands, grouped by module, with their argument names as the frontend sends them (Tauri converts
+them to snake_case on the Rust side). Every one returns WolfResult<T> except environment, which cannot fail.
+
+A.1 Tasks (7)
+--------------
+  list_tasks(query)                   task_overview()
+  create_task(task)                   task_stats()
+  update_task(id, update)             delete_task(id)
+  set_task_completed(id, completed)
+
+  task_overview() -> TaskOverview { stats, today, overdue }
+  task_stats()    -> TaskStats { total, completed, open, dueToday, overdue }
+
+A.2 Habits (8)
+---------------
+  list_habits(includeArchived)        complete_habit(habitId, date)
+  create_habit(habit)                 uncomplete_habit(habitId, date)
+  update_habit(id, update)            list_habit_completions(id)
+  set_habit_archived(id, archived)    delete_habit(id)
+
+  `date` is optional on complete_habit (null means today) but required on
+  uncomplete_habit, which must name the day being undone. Both are named for the
+  resulting state rather than a verb_first pattern.
+
+A.3 Calendar (10)
+-----------------
+  list_events(query)                  month_summaries(year, month)
+  upcoming_events(limit)              events_for_day(date)
+  create_event(event)                 due_event_reminders()
+  update_event(id, update)            mark_event_notified(id)
+  delete_event(id)                    calendar_overview()
+
+  month_summaries validates 1..=12 and pads to whole Monday weeks. The event
+  payload is { title, description?, startTime, endTime, allDay?, reminderMinutes? }
+  with times as "%Y-%m-%dT%H:%M" naive local.
+
+A.4 Focus (4)
+--------------
+  list_focus_sessions(limit)          focus_stats()
+  create_focus_session(session)       delete_focus_session(id)
+
+  focus_stats() -> { completedToday, completedWeek, totalCompleted,
+                     focusMinutesToday, focusMinutesWeek, dailyMinutes }
+
+A.5 Settings (3)
+-----------------
+  get_settings()                      save_settings(settings)
+  select_model(model)
+
+  All three return the sanitised Settings that was persisted, not the input; the
+  frontend treats that return value as authoritative. Note that the frontend sends
+  a full Settings object, so the Rust SettingsPatch path is only used by
+  save_companion_position and select_model.
+
+A.6 Ollama (5)
+--------------
+  ollama_status(url, model)           ask_ollama(prompt, history)
+  list_ollama_models(url)             ask_ollama_stream(request, channel)
+  suggested_model()
+
+  ask_ollama_stream returns AskAck { request_id } as soon as the request is
+  accepted, not when the stream ends. See 8.4.
+
+A.7 Assistant (2) — registered, never invoked
+-----------------------------------------------
+  assistant_context(query)            assistant_suggestions()
+
+  assistant_context returns { query, intent, context, system_prompt } with the
+  block assembled but no model contacted. assistant_suggestions returns six
+  canned strings. See 21.3.
+
+A.8 Desktop (10)
+----------------
+  show_main_window()                  set_companion_always_on_top(value)
+  hide_main_window()                  save_companion_position()
+  set_companion_visible(visible)      quit_app()
+  toggle_companion()                  notifications_available()
+  send_notification(summary, body, urgent)
+  environment()
+
+  set_companion_visible and toggle_companion both return the resulting
+  visibility bool. send_notification truncates to 80 and 400 characters before
+  handing the notification to D-Bus. environment() -> { sessionType, desktop,
+  appVersion, dataDir, notificationsAvailable }.
+
+A.9 Functions in commands/ that are not commands
+-------------------------------------------------
+desktop.rs also defines four plain functions used by lib.rs rather than by the frontend: apply_settings,
+apply_startup_preferences, handle_close_requested, and the state_ref accessor. mod.rs defines today(), local_now() and
+week_start().
+
+A.10 The twelve error kinds
+---------------------------
+  database  not_found  invalid  unavailable  no_models  model_not_found
+  bad_status  malformed  transport  timeout  desktop  internal
+
+WolfAppError.isOllamaIssue matches the seven Ollama kinds; isNotFound matches not_found. Every message is written for
+humans, because the UI renders it verbatim.
+================================================================================
+ APPENDIX B — FILE MAP
+================================================================================
+
+B.1 Root
+---------
+  package.json (20 scripts, 4 deps, 16 devDeps)   vite.config.ts (the only Vite
+  config; its test block is the only Vitest config)   tsconfig.json
+  eslint.config.js   index.html (main)   companion.html (companion)
+  migrations/0001_init.sql, migrations/0002_settings.sql
+  scripts/  check-dependencies.sh, check-sprite.mjs, generate-icons.mjs,
+            setup-arch.sh, sprite-preview.mjs
+  docs/  ARCHITECTURE.md, DEVELOPMENT.md
+  public/  favicon-16/32/64.png
+  DESCRIPTION.txt, LICENSE (MIT), README.md
+  No CI directory, no .github/, and no CHANGELOG or CONTRIBUTING file. Lockfiles
+  exist for both toolchains: package-lock.json and src-tauri/Cargo.lock.
+
+B.2 src-tauri/src
+-----------------
+  lib.rs              bootstrap, 2 plugins, 49 commands, tray, close handling
+  main.rs             calls wolf_lib::run(); nothing else
+  state.rs            AppState { db, ollama, RwLock<Settings>, AtomicU64 }
+  error.rs            WolfError, OllamaError, WolfResult, serialisation
+  models/             mod (TaskSort, TaskFilter, now_iso, new_id, priority
+                      constants) and task, habit, calendar, focus, settings,
+                      ollama
+  database/           mod (Database, with_conn, config_dir), migrator, tasks,
+                      habits, calendar, focus, settings, test_support
+  commands/           mod (today, local_now, week_start) and tasks, habits,
+                      calendar, focus, settings, ollama, assistant, desktop
+  ai/mod.rs           system prompt, Intent, classify_intent, build_context
+  ollama/             mod, client.rs (the HTTP client, StreamEvent, ChatChunk)
+  windows/mod.rs      window lookup, ensure_companion, visibility, topmost,
+                      position persist, quit
+  tray/mod.rs         menu, TrayAction, dispatch, embedded tray icon
+  notifications/mod.rs  Notification, notify, notify_best_effort, is_available
+
+  No companion/ directory, no desktop/ directory, no ollama/types.rs, and no
+  src-tauri/tests/ — every Rust test is in-module.
+
+B.3 src
+--------
+  main.tsx, companion.tsx, App.tsx (252 lines), types/index.ts (353)
+  hooks/useWolfFrames.ts
+  assets/wolf/  wolf-pixels.json, sprites.ts (802), animation.ts,
+                sprites.test.ts (41 cases)
+  assets/fonts/ Silkscreen-Regular.ttf, Silkscreen-Bold.ttf, OFL.txt
+  styles/       globals.css (728), theme.css (87), pixel.css (98),
+                animations.css (146)
+  utils/        date.ts, taskLogic.ts, timerLogic.ts + a .test.ts for each
+  services/     desktop/{bridge,desktopService,ipcContract.test}.ts
+                database/{task,habit,calendar,focus,settings}Service.ts
+                ollama/{OllamaClient,transport,types}.ts + OllamaClient.test.ts
+                notifications/notify.ts, errors.ts
+  stores/       taskStore, habitStore, calendarStore, focusStore, settingsStore,
+                ollamaStore, uiStore, wolfStore
+  pages/        Home, Tasks, Habits, Calendar, Focus, Assistant, Settings
+  components/   common/{ui,PixelProgress,Segmented}, Dashboard/QuickAdd,
+                Tasks/{TaskList,TaskFormDialog}, Calendar/EventFormDialog,
+                FocusTimer/TimerDisplay, Notifications/ToastHost,
+                WolfWidget/{WolfSprite,WolfWidget,Companion}
+
+  No services/api.ts, no services/desktop.ts, no tokens.css.
+
+B.4 Largest files
+-----------------
+  sprites.ts 802, globals.css 728, ollama/client.rs 638, database/habits.rs 511,
+  database/calendar.rs 484, SettingsPage.tsx 469, ai/mod.rs 422,
+  AssistantPage.tsx 391, types/index.ts 353, sprites.test.ts 346,
+  HomePage.tsx 341
+
+B.5 Generated icons
+-------------------
+scripts/generate-icons.mjs writes 14 PNGs from wolf-pixels.json with no image library — it emits the PNG chunks by hand, including its own CRC32 table and a zlib deflateSync call. src-tauri/icons/ gets 32x32 (32), 44x44 (44), 128x128 (128), 128x128@2x (256), icon.png (512), Square150x150Logo (150), Square44x44Logo (44), StoreLogo (50), tray.png (32), tray-22.png (22) and tray-16.png (16); public/ gets favicon-16, -32 and -64.
+
+tauri.conf.json references only 32x32, 44x44, 128x128 and icon.png in its bundle icon list; tray/mod.rs embeds tray-22.png with include_bytes!. Anything 32px or smaller is drawn as a simplified silhouette, because "at those sizes the full 19x19 head has less than one pixel per sprite cell" — the crop is row 2, column 4, 19x19, and the palette is remapped (ON_DARK inverts K and W to #F2F0E8, B to #6E767C and C to #4A5056) because the artwork is authored for a light background.
