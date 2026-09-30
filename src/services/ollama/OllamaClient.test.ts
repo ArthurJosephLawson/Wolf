@@ -195,8 +195,7 @@ describe("asking", () => {
     expect(typeof dispose).toBe("function");
   });
 
-  it("keeps delivering tokens that arrive after the ack resolves", async () => {
-    // The native side acknowledges the request and then streams in the
+  it("keeps delivering tokens that arrive after the ack resolves", async () => {    // The native side acknowledges the request and then streams in the
     // background, so the listener has to outlive the awaited promise.
     let deliver: ((event: StreamEvent) => void) | null = null;
     const client = new OllamaClient({
@@ -223,6 +222,80 @@ describe("asking", () => {
     dispose();
     deliver!({ type: "token", requestId: "chat-0", text: "after" });
     expect(seen).toHaveLength(1);
+  });
+});
+
+describe("local context", () => {
+  it("returns the resolved context and system prompt for a question", async () => {
+    const assistantContext = vi.fn(async (query: string) => ({
+      query,
+      intent: "tasks",
+      context: "<local_context>2 open tasks</local_context>",
+      systemPrompt: "You are Wolf.",
+    }));
+    const client = new OllamaClient({
+      transport: transport({ assistantContext }),
+      config: { url: "http://localhost:11434", model: "m" },
+    });
+
+    const resolved = await client.assistantContext("  what is overdue?  ");
+    expect(assistantContext).toHaveBeenCalledWith("what is overdue?");
+    expect(resolved?.context).toContain("2 open tasks");
+    expect(resolved?.systemPrompt).toBe("You are Wolf.");
+  });
+
+  it("skips the lookup for an empty question", async () => {
+    const assistantContext = vi.fn(transport().assistantContext);
+    const client = new OllamaClient({
+      transport: transport({ assistantContext }),
+      config: { url: "http://localhost:11434", model: "m" },
+    });
+    expect(await client.assistantContext("   ")).toBeNull();
+    expect(assistantContext).not.toHaveBeenCalled();
+  });
+
+  it("passes the resolved context and prompt through to the stream", async () => {
+    // The whole point of the wiring is that the block resolved for display is
+    // the block that is sent, so the request has to carry it explicitly.
+    let sent: AskRequest | null = null;
+    const client = new OllamaClient({
+      transport: transport({
+        askStream: async (req) => {
+          sent = req;
+          return { requestId: "chat-0" };
+        },
+      }),
+      config: { url: "http://localhost:11434", model: "m" },
+    });
+
+    const resolved = await client.assistantContext("what is due?");
+    await client.askStream(
+      {
+        messages: [{ role: "user", content: "what is due?" }],
+        context: resolved?.context,
+        systemPrompt: resolved?.systemPrompt,
+      },
+      () => undefined,
+    );
+
+    expect(sent).toMatchObject({
+      context: "<local_context>2 open tasks</local_context>",
+      systemPrompt: "You are Wolf.",
+    });
+  });
+
+  it("surfaces a failed lookup as a readable error", async () => {
+    const client = new OllamaClient({
+      transport: transport({
+        assistantContext: async () => {
+          throw new Error("database locked");
+        },
+      }),
+      config: { url: "http://localhost:11434", model: "m" },
+    });
+    await expect(client.assistantContext("hello")).rejects.toMatchObject({
+      name: "WolfAppError",
+    });
   });
 });
 
