@@ -97,9 +97,11 @@ localhost.
 
 ## Migrations
 
-`database/migrations.rs` embeds the `migrations/*.sql` files and applies them in
-lexicographic order inside a transaction, recording each in `schema_migrations`. Startup
-is therefore idempotent and a new version is a new numbered file. There is no down
+`database/migrator.rs` embeds the `migrations/*.sql` files with `include_str!` and
+applies them in the order they appear in its `MIGRATIONS` array — not sorted at
+runtime. Each one runs inside a transaction and is recorded in
+`schema_migrations`. Startup is therefore idempotent, and a new version is a new
+numbered file plus a new entry at the end of that array. There is no down
 migration: a corrupt or unreadable database is reported as an error rather than
 silently destroyed, because the file is the user's backup.
 
