@@ -66,9 +66,7 @@ pub fn migrate(conn: &Connection) -> WolfResult<usize> {
 /// Number of migrations recorded in the database. Used by tests and diagnostics.
 pub fn applied_count(conn: &Connection) -> WolfResult<usize> {
     ensure_migration_table(conn)?;
-    let count: i64 = conn.query_row("SELECT COUNT(*) FROM schema_migrations", [], |r| {
-        r.get(0)
-    })?;
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM schema_migrations", [], |r| r.get(0))?;
     Ok(count as usize)
 }
 

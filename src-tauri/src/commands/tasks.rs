@@ -12,7 +12,9 @@ pub fn list_tasks(
     query: Option<TaskListQuery>,
 ) -> WolfResult<Vec<Task>> {
     let query = query.unwrap_or_default();
-    state.db.list_tasks(&query, &today().format("%Y-%m-%d").to_string())
+    state
+        .db
+        .list_tasks(&query, &today().format("%Y-%m-%d").to_string())
 }
 
 #[tauri::command]

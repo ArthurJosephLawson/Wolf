@@ -13,7 +13,10 @@ use crate::state::AppState;
 
 /// The `<local_context>` block Wolf would send for `query`.
 #[tauri::command]
-pub fn assistant_context(state: State<'_, AppState>, query: String) -> WolfResult<AssistantContext> {
+pub fn assistant_context(
+    state: State<'_, AppState>,
+    query: String,
+) -> WolfResult<AssistantContext> {
     let context = ai::build_context(&state.db, &query, today())?;
     let intent = ai::classify_intent(&query).label().to_string();
     Ok(AssistantContext {

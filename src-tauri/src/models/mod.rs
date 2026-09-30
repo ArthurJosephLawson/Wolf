@@ -62,7 +62,8 @@ pub use habit::{
     Habit, HabitCompletion, HabitDay, HabitFrequency, HabitUpdate, HabitWithProgress, NewHabit,
 };
 pub use ollama::{
-    ChatMessage, ChatRequest, ChatResponse, ChatRole, OllamaModel, OllamaState, OllamaStatus, StreamDone,
+    ChatMessage, ChatRequest, ChatResponse, ChatRole, OllamaModel, OllamaState, OllamaStatus,
+    StreamDone,
 };
 pub use settings::{Settings, SettingsPatch};
 pub use task::{NewTask, Task, TaskListQuery, TaskStats, TaskUpdate};

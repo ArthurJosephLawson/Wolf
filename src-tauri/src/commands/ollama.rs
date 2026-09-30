@@ -95,7 +95,10 @@ pub async fn ask_ollama_stream(
 
     // Pre-flight the daemon so the user gets an instant, clear error instead of
     // a stream that silently never starts.
-    let status = state.ollama.status(&settings.ollama_url, &requested_model).await?;
+    let status = state
+        .ollama
+        .status(&settings.ollama_url, &requested_model)
+        .await?;
     if status.state != OllamaState::Ready {
         let err = match status.state {
             OllamaState::Offline => OllamaError::Unavailable {

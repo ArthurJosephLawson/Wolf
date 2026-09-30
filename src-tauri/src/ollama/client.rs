@@ -98,9 +98,16 @@ pub enum StreamEvent {
     /// Incremental text, already decoded from the NDJSON frame.
     Token { request_id: String, text: String },
     /// Terminal payload with timing metadata.
-    Done { request_id: String, summary: StreamDone },
+    Done {
+        request_id: String,
+        summary: StreamDone,
+    },
     /// The stream ended early; `message` is safe to show to the user.
-    Failed { request_id: String, message: String, kind: String },
+    Failed {
+        request_id: String,
+        message: String,
+        kind: String,
+    },
 }
 
 pub struct OllamaClient {
@@ -156,7 +163,10 @@ impl OllamaClient {
             .map_err(|e| WolfError::Ollama(Self::map_transport_error(e, base)))?;
 
         if !response.status().is_success() {
-            return Err(OllamaError::BadStatus { status: response.status().as_u16() }.into());
+            return Err(OllamaError::BadStatus {
+                status: response.status().as_u16(),
+            }
+            .into());
         }
 
         let body: VersionResponse = response
@@ -176,7 +186,10 @@ impl OllamaClient {
             .map_err(|e| WolfError::Ollama(Self::map_transport_error(e, base)))?;
 
         if !response.status().is_success() {
-            return Err(OllamaError::BadStatus { status: response.status().as_u16() }.into());
+            return Err(OllamaError::BadStatus {
+                status: response.status().as_u16(),
+            }
+            .into());
         }
 
         let body: TagsResponse = response
@@ -192,7 +205,10 @@ impl OllamaClient {
                 size: m.size,
                 family: m.details.as_ref().and_then(|d| d.family.clone()),
                 parameter_size: m.details.as_ref().and_then(|d| d.parameter_size.clone()),
-                quantization: m.details.as_ref().and_then(|d| d.quantization_level.clone()),
+                quantization: m
+                    .details
+                    .as_ref()
+                    .and_then(|d| d.quantization_level.clone()),
                 modified_at: None,
             })
             .collect())
@@ -293,7 +309,10 @@ impl OllamaClient {
         body.insert("model".into(), json!(request.model));
         body.insert("messages".into(), json!(request.to_api_messages()));
         body.insert("stream".into(), json!(stream));
-        body.insert("keep_alive".into(), json!(request.keep_alive.clone().unwrap_or_else(|| "10m".into())));
+        body.insert(
+            "keep_alive".into(),
+            json!(request.keep_alive.clone().unwrap_or_else(|| "10m".into())),
+        );
         if !options.is_empty() {
             body.insert("options".into(), serde_json::Value::Object(options));
         }
@@ -302,7 +321,12 @@ impl OllamaClient {
 
     /// Build the chat request. Kept separate from sending so both the streaming
     /// and one-shot paths share exactly one body shape.
-    fn send_chat(&self, base: &str, request: &ChatRequest, stream: bool) -> WolfResult<reqwest::RequestBuilder> {
+    fn send_chat(
+        &self,
+        base: &str,
+        request: &ChatRequest,
+        stream: bool,
+    ) -> WolfResult<reqwest::RequestBuilder> {
         let url = self.url(base, "/api/chat");
         Ok(self.http.post(url).json(&Self::chat_body(request, stream)))
     }
@@ -329,7 +353,10 @@ impl OllamaClient {
             .map_err(|e| WolfError::Ollama(Self::map_transport_error(e, base)))?;
 
         if !response.status().is_success() {
-            return Err(OllamaError::BadStatus { status: response.status().as_u16() }.into());
+            return Err(OllamaError::BadStatus {
+                status: response.status().as_u16(),
+            }
+            .into());
         }
 
         let chunk: ChatChunk = response
@@ -379,7 +406,9 @@ impl OllamaClient {
         };
 
         if !response.status().is_success() {
-            let err = WolfError::Ollama(OllamaError::BadStatus { status: response.status().as_u16() });
+            let err = WolfError::Ollama(OllamaError::BadStatus {
+                status: response.status().as_u16(),
+            });
             let _ = channel.send(StreamEvent::Failed {
                 request_id: request_id.to_string(),
                 message: err.to_string(),
@@ -514,15 +543,22 @@ const LOCAL_HOSTS: [&str; 2] = ["localhost", "127.0.0.1"];
 pub fn validate_base_url(raw: &str) -> WolfResult<String> {
     let trimmed = raw.trim().trim_end_matches('/');
     if trimmed.is_empty() {
-        return Err(OllamaError::NotAUrl { value: raw.to_string() }.into());
+        return Err(OllamaError::NotAUrl {
+            value: raw.to_string(),
+        }
+        .into());
     }
 
-    let parsed = reqwest::Url::parse(trimmed)
-        .map_err(|_| OllamaError::NotAUrl { value: trimmed.to_string() })?;
+    let parsed = reqwest::Url::parse(trimmed).map_err(|_| OllamaError::NotAUrl {
+        value: trimmed.to_string(),
+    })?;
 
     let host = parsed.host_str().unwrap_or_default().to_ascii_lowercase();
     if parsed.scheme() != "http" || !LOCAL_HOSTS.contains(&host.as_str()) {
-        return Err(OllamaError::NotLocal { host: trimmed.to_string() }.into());
+        return Err(OllamaError::NotLocal {
+            host: trimmed.to_string(),
+        }
+        .into());
     }
 
     Ok(trimmed.to_string())
@@ -582,7 +618,10 @@ mod tests {
                 size: m.size,
                 family: m.details.as_ref().and_then(|d| d.family.clone()),
                 parameter_size: m.details.as_ref().and_then(|d| d.parameter_size.clone()),
-                quantization: m.details.as_ref().and_then(|d| d.quantization_level.clone()),
+                quantization: m
+                    .details
+                    .as_ref()
+                    .and_then(|d| d.quantization_level.clone()),
                 modified_at: None,
             })
             .collect();
@@ -624,7 +663,10 @@ mod tests {
     #[test]
     fn empty_request_falls_back_to_first_model() {
         let models = vec![model("a:1"), model("b:2")];
-        assert_eq!(OllamaClient::resolve_model(&models, "  ").as_deref(), Some("a:1"));
+        assert_eq!(
+            OllamaClient::resolve_model(&models, "  ").as_deref(),
+            Some("a:1")
+        );
     }
 
     #[test]
@@ -655,17 +697,32 @@ mod tests {
 
     #[test]
     fn empty_model_is_rejected_before_any_request() {
-        let request = ChatRequest { model: "  ".into(), ..Default::default() };
+        let request = ChatRequest {
+            model: "  ".into(),
+            ..Default::default()
+        };
         let err = OllamaClient::model_guard(&request).expect_err("should fail");
         assert_eq!(err.kind(), "model_not_found");
     }
 
     #[test]
     fn states_serialise_to_snake_case() {
-        assert_eq!(serde_json::to_string(&OllamaState::NoModels).unwrap(), "\"no_models\"");
-        assert_eq!(serde_json::to_string(&OllamaState::ModelMissing).unwrap(), "\"model_missing\"");
-        assert_eq!(serde_json::to_string(&OllamaState::Offline).unwrap(), "\"offline\"");
-        assert_eq!(serde_json::to_string(&OllamaState::Ready).unwrap(), "\"ready\"");
+        assert_eq!(
+            serde_json::to_string(&OllamaState::NoModels).unwrap(),
+            "\"no_models\""
+        );
+        assert_eq!(
+            serde_json::to_string(&OllamaState::ModelMissing).unwrap(),
+            "\"model_missing\""
+        );
+        assert_eq!(
+            serde_json::to_string(&OllamaState::Offline).unwrap(),
+            "\"offline\""
+        );
+        assert_eq!(
+            serde_json::to_string(&OllamaState::Ready).unwrap(),
+            "\"ready\""
+        );
     }
 
     #[test]
@@ -676,7 +733,12 @@ mod tests {
             "http://127.0.0.1:11434",
             "http://127.0.0.1:8080",
         ] {
-            assert_eq!(validate_base_url(base).unwrap(), base, "{base} should be allowed");        }
+            assert_eq!(
+                validate_base_url(base).unwrap(),
+                base,
+                "{base} should be allowed"
+            );
+        }
     }
 
     #[test]
@@ -748,6 +810,9 @@ mod tests {
 
     #[test]
     fn the_default_url_is_accepted() {
-        assert_eq!(validate_base_url(DEFAULT_OLLAMA_URL).unwrap(), DEFAULT_OLLAMA_URL);
+        assert_eq!(
+            validate_base_url(DEFAULT_OLLAMA_URL).unwrap(),
+            DEFAULT_OLLAMA_URL
+        );
     }
 }

@@ -73,9 +73,9 @@ pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> WolfResult<()> {
         builder = builder.icon(icon);
     }
 
-    builder
-        .build(app)
-        .map_err(|e| crate::error::WolfError::desktop(format!("Could not create the tray icon: {e}")))?;
+    builder.build(app).map_err(|e| {
+        crate::error::WolfError::desktop(format!("Could not create the tray icon: {e}"))
+    })?;
 
     Ok(())
 }
@@ -103,7 +103,12 @@ fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: tauri::menu::MenuEve
 
 fn handle_tray_event<R: Runtime>(tray: &tauri::tray::TrayIcon<R>, event: TrayIconEvent) {
     // Left click toggles the main window; the menu is on right click.
-    if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+    if let TrayIconEvent::Click {
+        button: MouseButton::Left,
+        button_state: MouseButtonState::Up,
+        ..
+    } = event
+    {
         dispatch(tray.app_handle(), TrayAction::Open);
     }
 }
@@ -142,7 +147,11 @@ fn dispatch<R: Runtime>(app: &AppHandle<R>, action: TrayAction) {
             }
         }
         TrayAction::StartFocus | TrayAction::PauseFocus => {
-            let verb = if matches!(action, TrayAction::StartFocus) { "start" } else { "pause" };
+            let verb = if matches!(action, TrayAction::StartFocus) {
+                "start"
+            } else {
+                "pause"
+            };
             let _ = app.emit(TRAY_EVENT, serde_json::json!({ "focus": verb }));
         }
     }

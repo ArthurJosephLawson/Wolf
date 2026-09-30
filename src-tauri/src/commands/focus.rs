@@ -10,7 +10,9 @@ pub fn list_focus_sessions(
     state: State<'_, AppState>,
     limit: Option<u32>,
 ) -> WolfResult<Vec<FocusSession>> {
-    state.db.list_focus_sessions(limit.unwrap_or(20).clamp(1, 200))
+    state
+        .db
+        .list_focus_sessions(limit.unwrap_or(20).clamp(1, 200))
 }
 
 #[tauri::command]

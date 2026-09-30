@@ -47,7 +47,11 @@ fn validate_priority(value: i64) -> WolfResult<i64> {
 fn validate_date(value: &str) -> WolfResult<String> {
     chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
         .map(|_| value.to_string())
-        .map_err(|_| WolfError::invalid(format!("`{value}` is not a valid date (expected YYYY-MM-DD).")))
+        .map_err(|_| {
+            WolfError::invalid(format!(
+                "`{value}` is not a valid date (expected YYYY-MM-DD)."
+            ))
+        })
 }
 
 impl Database {
@@ -236,9 +240,8 @@ impl Database {
     }
 
     pub fn delete_task(&self, id: &str) -> WolfResult<()> {
-        let removed = self.with_conn(|conn| {
-            Ok(conn.execute("DELETE FROM tasks WHERE id = ?1", params![id])?)
-        })?;
+        let removed = self
+            .with_conn(|conn| Ok(conn.execute("DELETE FROM tasks WHERE id = ?1", params![id])?))?;
         if removed == 0 {
             return Err(WolfError::not_found("Task"));
         }

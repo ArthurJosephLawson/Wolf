@@ -131,9 +131,6 @@ mod tests {
 
     #[test]
     fn not_found_message_is_readable() {
-        assert_eq!(
-            WolfError::not_found("Task").to_string(),
-            "Task not found."
-        );
+        assert_eq!(WolfError::not_found("Task").to_string(), "Task not found.");
     }
 }

@@ -39,12 +39,24 @@ mod tests {
     #[test]
     fn week_start_is_monday() {
         // 2026-09-28 is a Monday, so it is already its own week start.
-        assert_eq!(week_start(chrono::NaiveDate::from_ymd_opt(2026, 9, 28).unwrap()), "2026-09-28");
+        assert_eq!(
+            week_start(chrono::NaiveDate::from_ymd_opt(2026, 9, 28).unwrap()),
+            "2026-09-28"
+        );
         // 2026-09-30 is a Wednesday.
-        assert_eq!(week_start(chrono::NaiveDate::from_ymd_opt(2026, 9, 30).unwrap()), "2026-09-28");
+        assert_eq!(
+            week_start(chrono::NaiveDate::from_ymd_opt(2026, 9, 30).unwrap()),
+            "2026-09-28"
+        );
         // 2026-10-04 is a Sunday, so that week still started on 2026-09-28.
-        assert_eq!(week_start(chrono::NaiveDate::from_ymd_opt(2026, 10, 4).unwrap()), "2026-09-28");
+        assert_eq!(
+            week_start(chrono::NaiveDate::from_ymd_opt(2026, 10, 4).unwrap()),
+            "2026-09-28"
+        );
         // 2026-10-05 is the next Monday.
-        assert_eq!(week_start(chrono::NaiveDate::from_ymd_opt(2026, 10, 5).unwrap()), "2026-10-05");
+        assert_eq!(
+            week_start(chrono::NaiveDate::from_ymd_opt(2026, 10, 5).unwrap()),
+            "2026-10-05"
+        );
     }
 }

@@ -21,7 +21,11 @@ pub fn create_habit(state: State<'_, AppState>, habit: NewHabit) -> WolfResult<H
 }
 
 #[tauri::command]
-pub fn update_habit(state: State<'_, AppState>, id: String, update: HabitUpdate) -> WolfResult<Habit> {
+pub fn update_habit(
+    state: State<'_, AppState>,
+    id: String,
+    update: HabitUpdate,
+) -> WolfResult<Habit> {
     state.db.update_habit(&id, &update)
 }
 

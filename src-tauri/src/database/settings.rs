@@ -37,8 +37,9 @@ impl Database {
     /// Persist settings, always writing a sanitised copy.
     pub fn save_settings(&self, settings: &Settings) -> WolfResult<Settings> {
         let clean = settings.clone().sanitized();
-        let encoded = serde_json::to_string(&clean)
-            .map_err(|e| crate::error::WolfError::internal(format!("Could not encode settings: {e}")))?;
+        let encoded = serde_json::to_string(&clean).map_err(|e| {
+            crate::error::WolfError::internal(format!("Could not encode settings: {e}"))
+        })?;
 
         self.with_conn(|conn| {
             conn.execute(
@@ -83,7 +84,10 @@ mod tests {
     fn values_are_sanitised_on_save() {
         let db = test_db();
         let saved = db
-            .save_settings(&Settings { focus_minutes: 9_999, ..Settings::default() })
+            .save_settings(&Settings {
+                focus_minutes: 9_999,
+                ..Settings::default()
+            })
             .unwrap();
         assert_eq!(saved.focus_minutes, 180);
         assert_eq!(db.load_settings().unwrap().focus_minutes, 180);

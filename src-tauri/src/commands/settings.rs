@@ -25,10 +25,7 @@ pub fn save_settings(
 /// Wolf never installs models for you, but it does resolve friendly names such
 /// as `qwen2.5-coder` to the concrete installed tag (`qwen2.5-coder:7b`).
 #[tauri::command]
-pub async fn select_model(
-    state: State<'_, AppState>,
-    model: String,
-) -> WolfResult<Settings> {
+pub async fn select_model(state: State<'_, AppState>, model: String) -> WolfResult<Settings> {
     let settings = state.settings();
     let status = state.ollama.status(&settings.ollama_url, &model).await?;
     let resolved = status.model.clone().unwrap_or_else(|| model.clone());

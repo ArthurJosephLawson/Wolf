@@ -9,8 +9,7 @@ use crate::models::focus::{
 };
 use crate::models::new_id;
 
-const SELECT_COLUMNS: &str =
-    "id, started_at, ended_at, duration_seconds, completed, kind";
+const SELECT_COLUMNS: &str = "id, started_at, ended_at, duration_seconds, completed, kind";
 
 fn map_session(row: &Row<'_>) -> rusqlite::Result<FocusSession> {
     Ok(FocusSession {
@@ -41,8 +40,7 @@ impl Database {
         let session = FocusSession {
             id: new_id(),
             started_at: started_at.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-            ended_at: ended_at
-                .map(|e| e.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)),
+            ended_at: ended_at.map(|e| e.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)),
             duration_seconds: input.duration_seconds.unwrap_or(0).min(24 * 60 * 60),
             completed: input.completed.unwrap_or(false),
             kind: input.kind.unwrap_or(FocusSessionKind::Focus),
@@ -160,12 +158,10 @@ impl Database {
                 })
                 .collect();
 
-            let minutes_of = |day: &str| -> i64 {
-                counted.get(day).map(|(_, minutes)| *minutes).unwrap_or(0)
-            };
-            let count_of = |day: &str| -> i64 {
-                counted.get(day).map(|(count, _)| *count).unwrap_or(0)
-            };
+            let minutes_of =
+                |day: &str| -> i64 { counted.get(day).map(|(_, minutes)| *minutes).unwrap_or(0) };
+            let count_of =
+                |day: &str| -> i64 { counted.get(day).map(|(count, _)| *count).unwrap_or(0) };
 
             let total_completed: i64 = conn.query_row(
                 "SELECT COUNT(*) FROM focus_sessions WHERE completed = 1 AND kind = 'focus'",
@@ -199,7 +195,9 @@ struct DayWindow {
 
 fn parse_local_day(value: &str) -> WolfResult<chrono::NaiveDate> {
     chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| {
-        WolfError::invalid(format!("`{value}` is not a valid date (expected YYYY-MM-DD)."))
+        WolfError::invalid(format!(
+            "`{value}` is not a valid date (expected YYYY-MM-DD)."
+        ))
     })
 }
 
@@ -278,7 +276,9 @@ mod tests {
     #[test]
     fn create_and_list() {
         let db = test_db();
-        let created = db.create_focus_session(&session("2026-09-28", 25)).expect("create");
+        let created = db
+            .create_focus_session(&session("2026-09-28", 25))
+            .expect("create");
         assert!(created.completed);
         assert_eq!(created.duration_seconds, 1500);
         assert_eq!(db.list_focus_sessions(10).unwrap().len(), 1);
@@ -317,7 +317,12 @@ mod tests {
         let mut input = session("2026-09-28", 25);
         input.completed = Some(false);
         db.create_focus_session(&input).unwrap();
-        assert_eq!(db.focus_stats("2026-09-28", "2026-09-22").unwrap().completed_today, 0);
+        assert_eq!(
+            db.focus_stats("2026-09-28", "2026-09-22")
+                .unwrap()
+                .completed_today,
+            0
+        );
     }
 
     #[test]
@@ -328,7 +333,10 @@ mod tests {
             ended_at: Some("2026-09-28T09:00:00Z".into()),
             ..Default::default()
         };
-        assert_eq!(db.create_focus_session(&input).unwrap_err().kind(), "invalid");
+        assert_eq!(
+            db.create_focus_session(&input).unwrap_err().kind(),
+            "invalid"
+        );
     }
 
     #[test]
@@ -338,7 +346,10 @@ mod tests {
             started_at: "yesterday".into(),
             ..Default::default()
         };
-        assert_eq!(db.create_focus_session(&input).unwrap_err().kind(), "invalid");
+        assert_eq!(
+            db.create_focus_session(&input).unwrap_err().kind(),
+            "invalid"
+        );
     }
 
     #[test]
@@ -346,11 +357,20 @@ mod tests {
         let db = test_db();
         db.create_focus_session(&session("2026-09-22", 25)).unwrap();
         let stats = db.focus_stats("2026-09-28", "2026-09-22").unwrap();
-        let dates: Vec<&str> = stats.daily_minutes.iter().map(|d| d.date.as_str()).collect();
+        let dates: Vec<&str> = stats
+            .daily_minutes
+            .iter()
+            .map(|d| d.date.as_str())
+            .collect();
         assert_eq!(
             dates,
             vec![
-                "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25", "2026-09-26", "2026-09-27",
+                "2026-09-22",
+                "2026-09-23",
+                "2026-09-24",
+                "2026-09-25",
+                "2026-09-26",
+                "2026-09-27",
                 "2026-09-28"
             ]
         );
@@ -364,8 +384,10 @@ mod tests {
         // one at 00:30 on the next both land on the *UTC* day before or after
         // for most timezones, which is what the old substr comparison used.
         let db = test_db();
-        db.create_focus_session(&local_session("2026-09-27", 23, 30, 25)).unwrap();
-        db.create_focus_session(&local_session("2026-09-28", 0, 30, 50)).unwrap();
+        db.create_focus_session(&local_session("2026-09-27", 23, 30, 25))
+            .unwrap();
+        db.create_focus_session(&local_session("2026-09-28", 0, 30, 50))
+            .unwrap();
 
         let stats = db.focus_stats("2026-09-28", "2026-09-22").expect("stats");
         let minutes = |day: &str| {
@@ -377,8 +399,16 @@ mod tests {
                 .unwrap_or(u32::MAX)
         };
 
-        assert_eq!(minutes("2026-09-27"), 25, "late session belongs to the 27th");
-        assert_eq!(minutes("2026-09-28"), 50, "early session belongs to the 28th");
+        assert_eq!(
+            minutes("2026-09-27"),
+            25,
+            "late session belongs to the 27th"
+        );
+        assert_eq!(
+            minutes("2026-09-28"),
+            50,
+            "early session belongs to the 28th"
+        );
         assert_eq!(stats.focus_minutes_today, 50);
         assert_eq!(stats.completed_today, 1);
         assert_eq!(stats.focus_minutes_week, 75);
@@ -387,8 +417,10 @@ mod tests {
     #[test]
     fn a_session_exactly_at_local_midnight_belongs_to_the_new_day() {
         let db = test_db();
-        db.create_focus_session(&local_session("2026-09-28", 0, 0, 25)).unwrap();
-        db.create_focus_session(&local_session("2026-09-27", 23, 59, 25)).unwrap();
+        db.create_focus_session(&local_session("2026-09-28", 0, 0, 25))
+            .unwrap();
+        db.create_focus_session(&local_session("2026-09-27", 23, 59, 25))
+            .unwrap();
 
         let stats = db.focus_stats("2026-09-28", "2026-09-22").expect("stats");
         let minutes = |day: &str| {

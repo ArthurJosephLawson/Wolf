@@ -30,8 +30,11 @@ fn map_event(row: &Row<'_>) -> rusqlite::Result<CalendarEvent> {
 }
 
 pub fn parse_event_time(raw: &str, field: &str) -> WolfResult<NaiveDateTime> {
-    NaiveDateTime::parse_from_str(raw.trim(), EVENT_DATETIME_FORMAT)
-        .map_err(|_| WolfError::invalid(format!("`{raw}` is not a valid {field} (expected YYYY-MM-DDTHH:MM).")))
+    NaiveDateTime::parse_from_str(raw.trim(), EVENT_DATETIME_FORMAT).map_err(|_| {
+        WolfError::invalid(format!(
+            "`{raw}` is not a valid {field} (expected YYYY-MM-DDTHH:MM)."
+        ))
+    })
 }
 
 fn validate_title(raw: &str) -> WolfResult<String> {
@@ -53,9 +56,7 @@ impl Database {
         let start = parse_event_time(&input.start_time, "start time")?;
         let end = parse_event_time(&input.end_time, "end time")?;
         if end < start {
-            return Err(WolfError::invalid(
-                "An event cannot end before it starts.",
-            ));
+            return Err(WolfError::invalid("An event cannot end before it starts."));
         }
         if input.all_day.unwrap_or(false) && end.date() != start.date() {
             return Err(WolfError::invalid(
@@ -160,7 +161,11 @@ impl Database {
         })
     }
 
-    pub fn update_event(&self, id: &str, update: &CalendarEventUpdate) -> WolfResult<CalendarEvent> {
+    pub fn update_event(
+        &self,
+        id: &str,
+        update: &CalendarEventUpdate,
+    ) -> WolfResult<CalendarEvent> {
         let title = update.title.as_deref().map(validate_title).transpose()?;
         let start = update
             .start_time
@@ -293,7 +298,10 @@ impl Database {
                  GROUP BY due_date",
             )?;
             let rows = stmt.query_map(
-                params![from.format("%Y-%m-%d").to_string(), to.format("%Y-%m-%d").to_string()],
+                params![
+                    from.format("%Y-%m-%d").to_string(),
+                    to.format("%Y-%m-%d").to_string()
+                ],
                 |r| {
                     Ok((
                         r.get::<_, String>(0)?,
@@ -315,7 +323,9 @@ impl Database {
             let key = cursor.format("%Y-%m-%d").to_string();
             let day_events: Vec<CalendarEvent> = events
                 .iter()
-                .filter(|e| e.start_time.starts_with(&key) || (e.all_day && e.end_time.starts_with(&key)))
+                .filter(|e| {
+                    e.start_time.starts_with(&key) || (e.all_day && e.end_time.starts_with(&key))
+                })
                 .cloned()
                 .collect();
             let (task_count, completed_task_count) = counts.get(&key).copied().unwrap_or((0, 0));
@@ -330,7 +340,12 @@ impl Database {
         Ok(out)
     }
 
-    pub fn count_events_in_range(&self, conn: &Connection, from: &str, to: &str) -> WolfResult<u32> {
+    pub fn count_events_in_range(
+        &self,
+        conn: &Connection,
+        from: &str,
+        to: &str,
+    ) -> WolfResult<u32> {
         let count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM calendar_events WHERE end_time >= ?1 AND start_time <= ?2",
             params![from, to],
@@ -386,8 +401,10 @@ mod tests {
     #[test]
     fn range_query_includes_overlapping_events() {
         let db = test_db();
-        db.create_event(&new_event("2026-09-27T22:00", "2026-09-28T02:00")).unwrap();
-        db.create_event(&new_event("2026-09-30T09:00", "2026-09-30T10:00")).unwrap();
+        db.create_event(&new_event("2026-09-27T22:00", "2026-09-28T02:00"))
+            .unwrap();
+        db.create_event(&new_event("2026-09-30T09:00", "2026-09-30T10:00"))
+            .unwrap();
 
         let found = db
             .list_events(&EventListQuery {
@@ -433,7 +450,10 @@ mod tests {
         let updated = db
             .update_event(
                 &created.id,
-                &CalendarEventUpdate { reminder_minutes: Some(Some(30)), ..Default::default() },
+                &CalendarEventUpdate {
+                    reminder_minutes: Some(Some(30)),
+                    ..Default::default()
+                },
             )
             .unwrap();
         assert_eq!(updated.reminder_minutes, Some(30));
@@ -454,8 +474,10 @@ mod tests {
     #[test]
     fn day_summaries_include_task_counts() {
         let db = test_db();
-        db.create_event(&new_event("2026-09-28T09:00", "2026-09-28T09:15")).unwrap();
-        db.create_task("Write report", None, None, Some("2026-09-28")).unwrap();
+        db.create_event(&new_event("2026-09-28T09:00", "2026-09-28T09:15"))
+            .unwrap();
+        db.create_task("Write report", None, None, Some("2026-09-28"))
+            .unwrap();
 
         let from = NaiveDate::from_ymd_opt(2026, 9, 28).unwrap();
         let to = NaiveDate::from_ymd_opt(2026, 9, 29).unwrap();

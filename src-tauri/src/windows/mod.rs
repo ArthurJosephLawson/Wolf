@@ -30,8 +30,12 @@ pub fn companion_window<R: Runtime>(app: &AppHandle<R>) -> WolfResult<tauri::Web
 pub fn show_main<R: Runtime>(app: &AppHandle<R>) -> WolfResult<()> {
     let window = main_window(app)?;
     window.unminimize().ok();
-    window.show().map_err(|e| WolfError::desktop(e.to_string()))?;
-    window.set_focus().map_err(|e| WolfError::desktop(e.to_string()))?;
+    window
+        .show()
+        .map_err(|e| WolfError::desktop(e.to_string()))?;
+    window
+        .set_focus()
+        .map_err(|e| WolfError::desktop(e.to_string()))?;
     Ok(())
 }
 
@@ -49,7 +53,9 @@ pub fn ensure_companion<R: Runtime>(app: &AppHandle<R>) -> WolfResult<tauri::Web
         if existing.is_visible().unwrap_or(false) {
             return Ok(existing);
         }
-        existing.show().map_err(|e| WolfError::desktop(e.to_string()))?;
+        existing
+            .show()
+            .map_err(|e| WolfError::desktop(e.to_string()))?;
         return Ok(existing);
     }
 
@@ -94,9 +100,13 @@ pub fn ensure_companion<R: Runtime>(app: &AppHandle<R>) -> WolfResult<tauri::Web
 pub fn set_companion_visible<R: Runtime>(app: &AppHandle<R>, visible: bool) -> WolfResult<()> {
     if visible {
         let window = ensure_companion(app)?;
-        window.show().map_err(|e| WolfError::desktop(e.to_string()))?;
+        window
+            .show()
+            .map_err(|e| WolfError::desktop(e.to_string()))?;
     } else if let Some(window) = app.get_webview_window(COMPANION_WINDOW) {
-        window.hide().map_err(|e| WolfError::desktop(e.to_string()))?;
+        window
+            .hide()
+            .map_err(|e| WolfError::desktop(e.to_string()))?;
     }
     Ok(())
 }

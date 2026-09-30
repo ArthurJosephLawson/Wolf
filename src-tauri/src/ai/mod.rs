@@ -4,10 +4,10 @@
 //! happily, so the prompt is explicit: only trust the `<local_context>` block,
 //! say so when the block is empty, and never invent tasks or appointments.
 
-use chrono::NaiveDate;
 use crate::database::Database;
 use crate::error::WolfResult;
 use crate::models::{TaskFilter, TaskListQuery, TaskSort};
+use chrono::NaiveDate;
 
 /// Maximum characters any single section may contribute, so the whole context
 /// block stays small enough for a 2B model to reason over.
@@ -72,8 +72,14 @@ pub fn classify_intent(query: &str) -> Intent {
     let q = query.to_lowercase();
     let has = |needles: &[&str]| needles.iter().any(|n| q.contains(n));
 
-    if has(&["summar", "how was my day", "recap", "catch me up", "brief me", "status of my day"])
-    {
+    if has(&[
+        "summar",
+        "how was my day",
+        "recap",
+        "catch me up",
+        "brief me",
+        "status of my day",
+    ]) {
         return Intent::Summary;
     }
     if has(&["overdue", "late", "behind", "missed"]) {
@@ -88,10 +94,24 @@ pub fn classify_intent(query: &str) -> Intent {
     if has(&["tomorrow", "next day"]) {
         return Intent::Tomorrow;
     }
-    if has(&["next meeting", "upcoming", "next event", "schedule", "agenda", "calendar"]) {
+    if has(&[
+        "next meeting",
+        "upcoming",
+        "next event",
+        "schedule",
+        "agenda",
+        "calendar",
+    ]) {
         return Intent::Upcoming;
     }
-    if has(&["today", "this morning", "this afternoon", "this evening", "right now", "now"]) {
+    if has(&[
+        "today",
+        "this morning",
+        "this afternoon",
+        "this evening",
+        "right now",
+        "now",
+    ]) {
         return Intent::Today;
     }
     Intent::General
@@ -113,7 +133,9 @@ fn bullet(line: String) -> String {
 pub fn build_context(db: &Database, query: &str, today: NaiveDate) -> WolfResult<String> {
     let intent = classify_intent(query);
     let today_str = today.format("%Y-%m-%d").to_string();
-    let tomorrow = (today + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+    let tomorrow = (today + chrono::Duration::days(1))
+        .format("%Y-%m-%d")
+        .to_string();
     let now_local = chrono::Local::now().format("%Y-%m-%dT%H:%M").to_string();
 
     let mut sections: Vec<String> = Vec::new();
@@ -122,7 +144,9 @@ pub fn build_context(db: &Database, query: &str, today: NaiveDate) -> WolfResult
         sections.push(tasks_section(db, intent, &today_str)?);
     }
     if intent != Intent::Overdue && intent != Intent::Habits && intent != Intent::Focus {
-        sections.push(events_section(db, intent, &now_local, &today_str, &tomorrow)?);
+        sections.push(events_section(
+            db, intent, &now_local, &today_str, &tomorrow,
+        )?);
     }
     if intent == Intent::Habits || intent == Intent::Summary || intent == Intent::General {
         sections.push(habits_section(db, today)?);
@@ -132,7 +156,9 @@ pub fn build_context(db: &Database, query: &str, today: NaiveDate) -> WolfResult
     }
 
     let mut context = String::new();
-    context.push_str(&format!("Local date: {today_str} (local time {now_local}).\n"));
+    context.push_str(&format!(
+        "Local date: {today_str} (local time {now_local}).\n"
+    ));
     context.push_str(&format!("Question intent: {}.\n", intent.label()));
     for section in sections {
         if section.trim().is_empty() {
@@ -206,10 +232,7 @@ fn tasks_section(db: &Database, intent: Intent, today: &str) -> WolfResult<Strin
             Some(d) => format!("due {d}"),
             None => "no due date".to_string(),
         };
-        out.push_str(&bullet(format!(
-            "{} [{}] ({due})",
-            task.title, priority
-        )));
+        out.push_str(&bullet(format!("{} [{}] ({due})", task.title, priority)));
         out.push('\n');
     }
     if tasks.len() > MAX_TASKS {
@@ -226,7 +249,9 @@ fn events_section(
     tomorrow: &str,
 ) -> WolfResult<String> {
     let events = match intent {
-        Intent::Tomorrow => db.upcoming_events(now_local, 40)?.into_iter()
+        Intent::Tomorrow => db
+            .upcoming_events(now_local, 40)?
+            .into_iter()
             .filter(|e| e.start_time.as_str() > today)
             .filter(|e| e.start_time.as_str() < tomorrow || e.start_time.starts_with(tomorrow))
             .take(MAX_EVENTS)
@@ -313,10 +338,19 @@ mod tests {
     fn classifies_common_questions() {
         assert_eq!(classify_intent("What do I have today?"), Intent::Today);
         assert_eq!(classify_intent("what tasks are overdue"), Intent::Overdue);
-        assert_eq!(classify_intent("When is my next meeting?"), Intent::Upcoming);
-        assert_eq!(classify_intent("what's on my calendar tomorrow"), Intent::Tomorrow);
+        assert_eq!(
+            classify_intent("When is my next meeting?"),
+            Intent::Upcoming
+        );
+        assert_eq!(
+            classify_intent("what's on my calendar tomorrow"),
+            Intent::Tomorrow
+        );
         assert_eq!(classify_intent("how are my habits"), Intent::Habits);
-        assert_eq!(classify_intent("how many focus sessions did I complete"), Intent::Focus);
+        assert_eq!(
+            classify_intent("how many focus sessions did I complete"),
+            Intent::Focus
+        );
         assert_eq!(classify_intent("summarize my day"), Intent::Summary);
         assert_eq!(classify_intent("explain rust ownership"), Intent::General);
     }
@@ -332,8 +366,10 @@ mod tests {
     #[test]
     fn today_question_includes_due_tasks() {
         let db = test_db();
-        db.create_task("Ship the build", None, Some(3), Some("2026-09-28")).unwrap();
-        db.create_task("Later thing", None, None, Some("2026-10-01")).unwrap();
+        db.create_task("Ship the build", None, Some(3), Some("2026-09-28"))
+            .unwrap();
+        db.create_task("Later thing", None, None, Some("2026-10-01"))
+            .unwrap();
 
         let context = build_context(&db, "what do I have today", today()).unwrap();
         assert!(context.contains("Ship the build"));
@@ -344,8 +380,10 @@ mod tests {
     #[test]
     fn overdue_question_only_lists_overdue_tasks() {
         let db = test_db();
-        db.create_task("Late report", None, Some(2), Some("2026-09-20")).unwrap();
-        db.create_task("On time", None, None, Some("2026-09-30")).unwrap();
+        db.create_task("Late report", None, Some(2), Some("2026-09-20"))
+            .unwrap();
+        db.create_task("On time", None, None, Some("2026-09-30"))
+            .unwrap();
 
         let context = build_context(&db, "what tasks are overdue", today()).unwrap();
         assert!(context.contains("Late report"));
@@ -378,7 +416,10 @@ mod tests {
     fn habit_question_includes_streaks() {
         let db = test_db();
         let habit = db
-            .create_habit(&NewHabit { name: "Meditate".into(), ..Default::default() })
+            .create_habit(&NewHabit {
+                name: "Meditate".into(),
+                ..Default::default()
+            })
             .unwrap();
         db.complete_habit(&habit.id, "2026-09-27").unwrap();
         db.complete_habit(&habit.id, "2026-09-28").unwrap();
@@ -392,7 +433,8 @@ mod tests {
     #[test]
     fn focus_question_includes_counts() {
         let db = test_db();
-        let context = build_context(&db, "how many focus sessions did I complete", today()).unwrap();
+        let context =
+            build_context(&db, "how many focus sessions did I complete", today()).unwrap();
         assert!(context.contains("Focus sessions"));
         assert!(context.contains("No focus time logged"));
     }
@@ -401,8 +443,13 @@ mod tests {
     fn context_stays_within_the_total_budget() {
         let db = test_db();
         for i in 0..200 {
-            db.create_task(&format!("Task number {i}"), Some("a".repeat(400).as_str()), None, None)
-                .unwrap();
+            db.create_task(
+                &format!("Task number {i}"),
+                Some("a".repeat(400).as_str()),
+                None,
+                None,
+            )
+            .unwrap();
         }
         let context = build_context(&db, "summarize my day", today()).unwrap();
         assert!(

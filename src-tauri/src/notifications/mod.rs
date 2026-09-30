@@ -119,8 +119,7 @@ mod tests {
 
     #[test]
     fn dbus_transport_failures_mention_dbus() {
-        assert!(describe_notify_error("could not establish a D-Bus connection")
-            .contains("D-Bus"));
+        assert!(describe_notify_error("could not establish a D-Bus connection").contains("D-Bus"));
     }
 
     #[test]

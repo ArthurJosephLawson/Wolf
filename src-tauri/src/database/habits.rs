@@ -104,10 +104,7 @@ pub fn longest_streak(completions: &BTreeSet<NaiveDate>, habit: &Habit, today: N
 }
 
 impl Database {
-    pub fn create_habit(
-        &self,
-        input: &NewHabit,
-    ) -> WolfResult<Habit> {
+    pub fn create_habit(&self, input: &NewHabit) -> WolfResult<Habit> {
         let name = validate_name(&input.name)?;
         let habit = Habit {
             id: new_id(),
@@ -160,7 +157,9 @@ impl Database {
         let sql = if include_archived {
             format!("SELECT {SELECT_COLUMNS} FROM habits ORDER BY archived ASC, created_at ASC")
         } else {
-            format!("SELECT {SELECT_COLUMNS} FROM habits WHERE archived = 0 ORDER BY created_at ASC")
+            format!(
+                "SELECT {SELECT_COLUMNS} FROM habits WHERE archived = 0 ORDER BY created_at ASC"
+            )
         };
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(&sql)?;
@@ -179,7 +178,9 @@ impl Database {
 
         let changed = self.with_conn(|conn| {
             let exists: Option<String> = conn
-                .query_row("SELECT id FROM habits WHERE id = ?1", params![id], |r| r.get(0))
+                .query_row("SELECT id FROM habits WHERE id = ?1", params![id], |r| {
+                    r.get(0)
+                })
                 .optional()?;
             if exists.is_none() {
                 return Err(WolfError::not_found("Habit"));
@@ -213,12 +214,18 @@ impl Database {
 
     /// Habits are archived, never deleted, so history stays intact.
     pub fn archive_habit(&self, id: &str, archived: bool) -> WolfResult<Habit> {
-        self.update_habit(id, &HabitUpdate { archived: Some(archived), ..Default::default() })
+        self.update_habit(
+            id,
+            &HabitUpdate {
+                archived: Some(archived),
+                ..Default::default()
+            },
+        )
     }
 
     pub fn delete_habit(&self, id: &str) -> WolfResult<()> {
-        let removed =
-            self.with_conn(|conn| Ok(conn.execute("DELETE FROM habits WHERE id = ?1", params![id])?))?;
+        let removed = self
+            .with_conn(|conn| Ok(conn.execute("DELETE FROM habits WHERE id = ?1", params![id])?))?;
         if removed == 0 {
             return Err(WolfError::not_found("Habit"));
         }
@@ -300,12 +307,18 @@ impl Database {
 }
 
 fn normalize_date(date: &str) -> WolfResult<NaiveDate> {
-    NaiveDate::parse_from_str(date.trim(), "%Y-%m-%d")
-        .map_err(|_| WolfError::invalid(format!("`{date}` is not a valid date (expected YYYY-MM-DD).")))
+    NaiveDate::parse_from_str(date.trim(), "%Y-%m-%d").map_err(|_| {
+        WolfError::invalid(format!(
+            "`{date}` is not a valid date (expected YYYY-MM-DD)."
+        ))
+    })
 }
 
 pub fn build_progress(habit: &Habit, today: NaiveDate, dates: &[String]) -> HabitWithProgress {
-    let completions: BTreeSet<NaiveDate> = dates.iter().filter_map(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok()).collect();
+    let completions: BTreeSet<NaiveDate> = dates
+        .iter()
+        .filter_map(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+        .collect();
     let scheduled = scheduled_dates(habit, today);
 
     let recent: Vec<HabitDay> = (0..RECENT_WINDOW_DAYS)
@@ -391,7 +404,11 @@ mod tests {
     #[test]
     fn daily_streak_counts_consecutive_days() {
         let completions = set(&["2026-09-28", "2026-09-27", "2026-09-26"]);
-        let streak = current_streak(&completions, &habit(HabitFrequency::Daily), date("2026-09-28"));
+        let streak = current_streak(
+            &completions,
+            &habit(HabitFrequency::Daily),
+            date("2026-09-28"),
+        );
         assert_eq!(streak, 3);
     }
 
@@ -399,14 +416,22 @@ mod tests {
     fn unfinished_today_does_not_break_the_streak() {
         // Today not completed yet, but the three previous days are done.
         let completions = set(&["2026-09-27", "2026-09-26", "2026-09-25"]);
-        let streak = current_streak(&completions, &habit(HabitFrequency::Daily), date("2026-09-28"));
+        let streak = current_streak(
+            &completions,
+            &habit(HabitFrequency::Daily),
+            date("2026-09-28"),
+        );
         assert_eq!(streak, 3);
     }
 
     #[test]
     fn missing_day_breaks_the_streak() {
         let completions = set(&["2026-09-28", "2026-09-26"]);
-        let streak = current_streak(&completions, &habit(HabitFrequency::Daily), date("2026-09-28"));
+        let streak = current_streak(
+            &completions,
+            &habit(HabitFrequency::Daily),
+            date("2026-09-28"),
+        );
         assert_eq!(streak, 1);
     }
 
@@ -416,7 +441,10 @@ mod tests {
         let friday = habit(HabitFrequency::Weekdays);
         let completions = set(&["2026-09-25"]);
         let streak = current_streak(&completions, &friday, date("2026-09-28"));
-        assert_eq!(streak, 1, "weekend days are not scheduled and do not break the run");
+        assert_eq!(
+            streak, 1,
+            "weekend days are not scheduled and do not break the run"
+        );
     }
 
     #[test]
@@ -431,7 +459,12 @@ mod tests {
     #[test]
     fn longest_streak_finds_the_best_historical_run() {
         let completions = set(&[
-            "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-05", "2026-09-06", "2026-09-07",
+            "2026-09-01",
+            "2026-09-02",
+            "2026-09-03",
+            "2026-09-05",
+            "2026-09-06",
+            "2026-09-07",
             "2026-09-08",
         ]);
         let h = habit(HabitFrequency::Daily);
@@ -466,12 +499,20 @@ mod tests {
         assert_eq!(created.frequency, HabitFrequency::Weekdays);
 
         let updated = db
-            .update_habit(&created.id, &HabitUpdate { name: Some("Stretch more".into()), ..Default::default() })
+            .update_habit(
+                &created.id,
+                &HabitUpdate {
+                    name: Some("Stretch more".into()),
+                    ..Default::default()
+                },
+            )
             .expect("update");
         assert_eq!(updated.name, "Stretch more");
 
-        db.complete_habit(&created.id, "2026-09-28").expect("complete");
-        db.complete_habit(&created.id, "2026-09-28").expect("idempotent");
+        db.complete_habit(&created.id, "2026-09-28")
+            .expect("complete");
+        db.complete_habit(&created.id, "2026-09-28")
+            .expect("idempotent");
         assert_eq!(db.list_habit_completions(&created.id).unwrap().len(), 1);
 
         let progress = db
@@ -480,7 +521,8 @@ mod tests {
         assert_eq!(progress.len(), 1);
         assert!(progress[0].completed_today);
 
-        db.uncomplete_habit(&created.id, "2026-09-28").expect("uncomplete");
+        db.uncomplete_habit(&created.id, "2026-09-28")
+            .expect("uncomplete");
         assert!(db.list_habit_completions(&created.id).unwrap().is_empty());
 
         db.delete_habit(&created.id).expect("delete");
@@ -490,7 +532,12 @@ mod tests {
     #[test]
     fn deleting_habit_cascades_completions() {
         let db = test_db();
-        let h = db.create_habit(&NewHabit { name: "Run".into(), ..Default::default() }).unwrap();
+        let h = db
+            .create_habit(&NewHabit {
+                name: "Run".into(),
+                ..Default::default()
+            })
+            .unwrap();
         db.complete_habit(&h.id, "2026-09-28").unwrap();
         db.delete_habit(&h.id).unwrap();
 
@@ -505,7 +552,12 @@ mod tests {
     #[test]
     fn blank_name_is_rejected() {
         let db = test_db();
-        let err = db.create_habit(&NewHabit { name: "   ".into(), ..Default::default() }).unwrap_err();
+        let err = db
+            .create_habit(&NewHabit {
+                name: "   ".into(),
+                ..Default::default()
+            })
+            .unwrap_err();
         assert_eq!(err.kind(), "invalid");
     }
 }

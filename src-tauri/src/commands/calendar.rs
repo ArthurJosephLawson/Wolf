@@ -58,7 +58,9 @@ pub fn month_summaries(
     month: u32,
 ) -> WolfResult<Vec<DaySummary>> {
     if !(1..=12).contains(&month) {
-        return Err(crate::error::WolfError::invalid("Month must be between 1 and 12."));
+        return Err(crate::error::WolfError::invalid(
+            "Month must be between 1 and 12.",
+        ));
     }
     let first = chrono::NaiveDate::from_ymd_opt(year, month, 1)
         .ok_or_else(|| crate::error::WolfError::invalid("That month does not exist."))?;
@@ -146,10 +148,11 @@ pub fn calendar_overview(state: State<'_, AppState>) -> WolfResult<CalendarOverv
         to: Some(day),
         include_archived: None,
     })?;
-    let upcoming = state
-        .db
-        .upcoming_events(&crate::commands::local_now(), 6)?;
-    Ok(CalendarOverview { today_events, upcoming })
+    let upcoming = state.db.upcoming_events(&crate::commands::local_now(), 6)?;
+    Ok(CalendarOverview {
+        today_events,
+        upcoming,
+    })
 }
 
 #[derive(serde::Serialize)]
