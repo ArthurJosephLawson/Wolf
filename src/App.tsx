@@ -25,6 +25,9 @@ import { useFocusStore } from "./stores/focusStore";
 import { useTaskStore } from "./stores/taskStore";
 import { useWolfStore } from "./stores/wolfStore";
 import { desktopService } from "./services/desktop/desktopService";
+import { calendarService } from "./services/database/calendarService";
+import { MESSAGES, notify } from "./services/notifications/notify";
+import { minutesUntil, pendingReminders } from "./utils/reminderLogic";
 import { isDesktop } from "./services/desktop/bridge";
 import type { Route } from "./types";
 
@@ -37,6 +40,9 @@ const NAV: readonly { route: Route; label: string; icon: string }[] = [
   { route: "assistant", label: "Assistant", icon: "? " },
   { route: "settings", label: "Settings", icon: "⚙" },
 ];
+
+/** How often the reminder sweep runs. */
+const REMINDER_INTERVAL_MS = 30_000;
 
 export function App() {
   const route = useUiStore((s) => s.route);
@@ -93,6 +99,49 @@ export function App() {
   useEffect(() => {
     useFocusStore.getState().init(settings);
   }, [settings]);
+
+  // Event reminders. The backend already filters on its own setting; the sweep
+  // is gated here as well so a disabled toggle costs no polling at all.
+  useEffect(() => {
+    if (!isDesktop) return;
+    if (!settings.eventRemindersEnabled || !settings.notificationsEnabled)
+      return;
+
+    let cancelled = false;
+    // Delivery is awaited before the row is marked, so a slow notification
+    // service must not let the next tick start a second sweep on the same rows.
+    let inFlight = false;
+
+    const sweep = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const due = await calendarService.dueReminders();
+        if (cancelled) return;
+        for (const event of pendingReminders(due, new Date())) {
+          const minutes = minutesUntil(event.startTime, new Date());
+          await notify(MESSAGES.eventSoon(event.title, minutes));
+          if (cancelled) return;
+          await calendarService.markNotified(event.id);
+        }
+      } catch {
+        // Reminders are best-effort: a refused notification must not stop the
+        // app or stop the next sweep.
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void sweep();
+    const id = window.setInterval(() => void sweep(), REMINDER_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [
+    settings.eventRemindersEnabled,
+    settings.notificationsEnabled,
+  ]);
 
   // Tray menu and companion errors arrive as Tauri events. `listen` resolves
   // asynchronously, so the disposers are collected into a mutable holder and
