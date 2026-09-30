@@ -1,8 +1,9 @@
 //! Forward-only SQL migrator.
 //!
-//! Migrations live in `migrations/*.sql` at the repository root, are embedded
-//! into the binary at compile time and applied in filename order exactly once.
-//! No table is ever dropped or recreated by a migration.
+//! Migrations live in `migrations/*.sql` at the repository root and are embedded
+//! into the binary at compile time. They are applied in the order of the
+//! `MIGRATIONS` array, not in filename order, exactly once each. No table is
+//! ever dropped or recreated by a migration.
 
 use std::path::Path;
 
