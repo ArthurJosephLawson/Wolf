@@ -133,7 +133,7 @@ pub fn persist_companion_position<R: Runtime>(app: &AppHandle<R>) -> WolfResult<
     };
     let scale = if scale > 0.0 { scale } else { 1.0 };
     // A patch, not a full Settings: saving a position must not reset the user's
-    // Ollama model, focus durations or theme.
+    // Ollama model or focus durations.
     crate::state::state(app)?.patch_settings(crate::models::SettingsPatch {
         companion_x: Some(position.x as f64 / scale),
         companion_y: Some(position.y as f64 / scale),

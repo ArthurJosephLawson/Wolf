@@ -243,7 +243,6 @@ export interface Settings {
   startMinimized: boolean;
   closeToTray: boolean;
   autoCheckOllama: boolean;
-  theme: string;
   userName: string;
 }
 

@@ -13,6 +13,8 @@
  */
 
 :root {
+  color-scheme: dark;
+
   /* Canonical palette — the values from the sprite, verbatim. */
   --bg-primary: #1c2024;
   --bg-secondary: #2a2f35;
@@ -76,12 +78,4 @@
    */
   --shadow-offset: 3px;
   --shadow-hard: var(--shadow-offset) var(--shadow-offset) 0 0 var(--shadow);
-}
-
-/*
- * Honoured so persisted settings from an earlier build still apply cleanly, but
- * no longer selects a different palette: the theme is deliberately cohesive.
- */
-[data-theme] {
-  color-scheme: dark;
 }

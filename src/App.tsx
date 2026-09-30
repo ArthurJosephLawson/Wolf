@@ -78,12 +78,12 @@ export function App() {
     checkOllama,
   ]);
 
-  // Theme is a data attribute so the CSS can switch palettes without remounting.
+  // `data-window` lets the CSS tell the main window from the companion, which
+  // share one stylesheet but not one layout.
   useEffect(() => {
-    document.documentElement.dataset.theme = settings.theme;
     document.documentElement.dataset.window = "main";
     document.body.dataset.window = "main";
-  }, [settings.theme]);
+  }, []);
 
   // The wolf needs periodic re-evaluation for time-based rules (quiet hours,
   // transient state expiry) in this window too.

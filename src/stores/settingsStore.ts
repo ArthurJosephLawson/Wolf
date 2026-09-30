@@ -29,7 +29,6 @@ export const DEFAULT_SETTINGS: Settings = {
   startMinimized: false,
   closeToTray: true,
   autoCheckOllama: true,
-  theme: "midnight",
   userName: "",
 };
 

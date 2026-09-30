@@ -30,8 +30,6 @@ pub struct Settings {
     pub close_to_tray: bool,
     pub auto_check_ollama: bool,
 
-    /// Palette identifier resolved by `src/styles/theme.css`.
-    pub theme: String,
     /// Optional display name used in greetings.
     pub user_name: String,
 }
@@ -62,7 +60,6 @@ impl Default for Settings {
             close_to_tray: true,
             auto_check_ollama: true,
 
-            theme: "midnight".to_string(),
             user_name: "".to_string(),
         }
     }
@@ -93,11 +90,6 @@ impl Settings {
             self.companion_scale.clamp(0.5, 2.0)
         } else {
             1.0
-        };
-        self.theme = if self.theme.trim().is_empty() {
-            "midnight".to_string()
-        } else {
-            self.theme.trim().to_string()
         };
         self.user_name = self.user_name.trim().chars().take(40).collect();
         self
@@ -164,9 +156,6 @@ impl Settings {
         if let Some(v) = patch.auto_check_ollama {
             self.auto_check_ollama = v;
         }
-        if let Some(v) = patch.theme {
-            self.theme = v;
-        }
         if let Some(v) = patch.user_name {
             self.user_name = v;
         }
@@ -197,7 +186,6 @@ pub struct SettingsPatch {
     pub start_minimized: Option<bool>,
     pub close_to_tray: Option<bool>,
     pub auto_check_ollama: Option<bool>,
-    pub theme: Option<String>,
     pub user_name: Option<String>,
 }
 

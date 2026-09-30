@@ -70,11 +70,12 @@ mod tests {
         let custom = Settings {
             ollama_model: "gemma2:2b".into(),
             focus_minutes: 50,
-            theme: "dusk".into(),
+            user_name: "Arthur".into(),
             ..Settings::default()
         };
         let saved = db.save_settings(&custom).unwrap();
         assert_eq!(saved.focus_minutes, 50);
+        assert_eq!(saved.user_name, "Arthur");
         assert_eq!(db.load_settings().unwrap(), saved);
     }
 
@@ -95,6 +96,25 @@ mod tests {
             conn.execute(
                 "INSERT INTO settings (key, value, updated_at) VALUES ('app', 'not json', 'now')",
                 [],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(db.load_settings().unwrap(), Settings::default());
+    }
+
+    #[test]
+    fn a_row_written_before_the_theme_field_was_removed_still_loads() {
+        // Settings are one JSON blob, so databases written by an older build
+        // still carry `theme`. Serde ignores unknown fields, so those users keep
+        // their preferences instead of silently falling back to defaults.
+        let db = test_db();
+        let mut row = serde_json::to_value(Settings::default()).expect("encode");
+        row["theme"] = serde_json::json!("dusk");
+        db.with_conn(|conn| {
+            conn.execute(
+                "INSERT INTO settings (key, value, updated_at) VALUES ('app', ?1, ?2)",
+                rusqlite::params![serde_json::to_string(&row).expect("encode"), "now"],
             )?;
             Ok(())
         })
