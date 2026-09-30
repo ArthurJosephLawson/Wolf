@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new push supersedes an in-flight run for the same ref, so a second commit
+# does not leave queued jobs building a version nobody will merge.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Typecheck, lint and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 20 is the floor declared in package.json's engines, so CI tests the
+          # oldest version Wolf claims to support rather than whatever is newest.
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Tauri needs these to compile at all. Tauri's build scripts call
+      # pkg-config for webkit2gtk, and cargo check runs build scripts, so the
+      # checks job needs them too even though it never links a binary.
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      # The Rust side dominates the build time, so cache the target directory
+      # rather than recompiling every crate on each run.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      # verify is typecheck + lint + vitest + cargo check + cargo test. It does
+      # not include clippy or the formatter, so those are separate steps below
+      # rather than being silently skipped.
+      - name: Verify
+        run: npm run verify
+
+      - name: Clippy
+        run: npm run rust:clippy
+
+      - name: Formatting
+        run: npm run rust:fmt -- --check
+
+      - name: Frontend build
+        run: npm run build:web
+
+      - name: Sprite integrity
+        # The wolf is generated from wolf-pixels.json. This catches an edit to
+        # the artwork that breaks the mirror symmetry, the row widths or the
+        # palette, before anyone installs the app.
+        run: node scripts/check-sprite.mjs
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: checks
+    steps:
+      - uses: actions/checkout@v4
+
+      # Tauri's own libraries. Needed here because this job actually links the
+      # app, unlike the checks job above.
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Compiles the app without producing installers. Release artefacts and
+          # tags are the maintainer's call, not something a push should trigger.
+          args: --no-bundle
