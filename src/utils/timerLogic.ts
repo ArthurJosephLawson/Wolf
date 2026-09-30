@@ -22,14 +22,6 @@ export interface TimerSnapshot {
   accumulatedMs: number;
 }
 
-export const TIMER_STATUSES: readonly TimerStatus[] = [
-  "IDLE",
-  "FOCUSING",
-  "BREAK",
-  "PAUSED",
-  "COMPLETED",
-];
-
 export function phaseSeconds(phase: FocusPhase, settings: Settings): number {
   switch (phase) {
     case "focus":

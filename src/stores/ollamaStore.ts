@@ -35,7 +35,6 @@ interface OllamaStore {
   status: OllamaStatus | null;
   checking: boolean;
   error: string | null;
-  lastCheckedAt: number | null;
   check: (options?: { url?: string; model?: string }) => Promise<OllamaStatus>;
 }
 
@@ -43,7 +42,6 @@ export const useOllamaStore = create<OllamaStore>((set, get) => ({
   status: null,
   checking: false,
   error: null,
-  lastCheckedAt: null,
 
   async check(options) {
     set({ checking: true, error: null });
@@ -52,7 +50,7 @@ export const useOllamaStore = create<OllamaStore>((set, get) => ({
         url: options?.url,
         model: options?.model,
       });
-      set({ status, checking: false, lastCheckedAt: Date.now(), error: null });
+      set({ status, checking: false, error: null });
       return status;
     } catch (error) {
       // `OllamaClient.status` already converts failures into an offline status;

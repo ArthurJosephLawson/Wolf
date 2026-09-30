@@ -119,11 +119,6 @@ export function prioritySymbol(priority: TaskPriority): string {
   return ["▁", "▂", "▃", "█"][priority] ?? "▂";
 }
 
-/** Compact progress bar label: `3/8`. */
-export function progressLabel(done: number, total: number): string {
-  return `${done}/${total}`;
-}
-
 /** How loaded today is, used to pick the wolf's default pose. */
 export function dayPressure(stats: {
   dueToday: number;
