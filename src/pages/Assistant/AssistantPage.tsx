@@ -132,9 +132,11 @@ export function AssistantPage() {
       const client = getOllamaClient();
       client.update({ url: settings.ollamaUrl, model: settings.ollamaModel });
 
-      // Resolve the context for this exact question first. It is a read-only
-      // local lookup, and sending the block we resolved here is what lets the
-      // assistant promise that the context it shows is the context it used.
+      // Resolve the context for this exact question first, so it is classified
+      // against what the user just asked rather than a prompt built from a
+      // different wording. Sending the block resolved here also keeps the model
+      // and the screen on one context, instead of the native side rebuilding it
+      // from the message text.
       const resolved = await client.assistantContext(prompt);
       if (stopped) return;
 
