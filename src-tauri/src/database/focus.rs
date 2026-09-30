@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use rusqlite::{params, Row};
 
 use crate::database::Database;
@@ -87,72 +89,140 @@ impl Database {
     }
 
     /// Aggregate counters used by the dashboard, the focus screen and the AI.
+    ///
+    /// `today_local` and `week_start_local` are local calendar days. Sessions
+    /// are stored as UTC instants, so each local day is converted to its own
+    /// half-open UTC range and compared as a range. Slicing the stored string to
+    /// get a "day" would bucket a session by its UTC date instead, which puts
+    /// every late-evening session on the wrong day for most of the world.
     pub fn focus_stats(&self, today_local: &str, week_start_local: &str) -> WolfResult<FocusStats> {
+        let first = parse_local_day(week_start_local)?;
+        let days: Vec<DayWindow> = (0..7)
+            .map(|offset| {
+                let date = first + chrono::Duration::days(offset);
+                Ok(DayWindow {
+                    day: date.format("%Y-%m-%d").to_string(),
+                    from: local_day_start(date)?,
+                    until: local_day_start(date + chrono::Duration::days(1))?,
+                })
+            })
+            .collect::<WolfResult<Vec<_>>>()?;
+
         self.with_conn(|conn| {
-            let buckets: Vec<(i64, i64, i64)> = {
-                let mut stmt = conn.prepare(
-                    "SELECT
-                        COALESCE(SUM(CASE WHEN substr(started_at, 1, 10) = ?1 THEN 1 ELSE 0 END), 0),
-                        COALESCE(SUM(CASE WHEN substr(started_at, 1, 10) >= ?2 THEN 1 ELSE 0 END), 0),
-                        COALESCE(COUNT(*), 0)
-                     FROM focus_sessions
-                     WHERE completed = 1 AND kind = 'focus'",
-                )?;
-                let rows = stmt.query_map(params![today_local, week_start_local], |r| {
-                    Ok((r.get(0)?, r.get(1)?, r.get(2)?))
-                })?;
-                rows.collect::<Result<Vec<_>, _>>()?
-            };
-            let (completed_today, completed_week, total_completed) =
-                buckets.first().copied().unwrap_or((0, 0, 0));
-
-            let minutes: Vec<(String, i64)> = {
-                let mut stmt = conn.prepare(
-                    "SELECT substr(started_at, 1, 10) AS day,
-                            COALESCE(SUM(duration_seconds), 0) / 60
-                     FROM focus_sessions
-                     WHERE completed = 1 AND kind = 'focus' AND substr(started_at, 1, 10) >= ?1
-                     GROUP BY day",
-                )?;
-                let rows = stmt.query_map(params![week_start_local], |r| {
-                    Ok((r.get(0)?, r.get(1)?))
-                })?;
-                rows.collect::<Result<Vec<_>, _>>()?
-            };
-            let today_minutes: i64 = minutes
-                .iter()
-                .find(|(day, _)| day == today_local)
-                .map(|(_, m)| *m)
-                .unwrap_or(0);
-
-            // Fill gaps so the sparkline always has exactly 7 points, oldest first.
-            let mut daily_minutes = Vec::with_capacity(7);
-            let start = chrono::NaiveDate::parse_from_str(week_start_local, "%Y-%m-%d").ok();
-            for offset in 0..7 {
-                let date = start
-                    .map(|d| d + chrono::Duration::days(offset))
-                    .map(|d| d.format("%Y-%m-%d").to_string());
-                let minutes = date
-                    .as_deref()
-                    .and_then(|d| minutes.iter().find(|(day, _)| day == d))
-                    .map(|(_, m)| *m)
-                    .unwrap_or(0);
-                daily_minutes.push(DailyFocus {
-                    date: date.unwrap_or_default(),
-                    minutes: minutes.max(0) as u32,
-                });
+            // One row per local day, joined on that day's UTC range. The extra
+            // filters sit in the ON clause so a day with no sessions still
+            // produces a row instead of dropping out of the sparkline.
+            let mut sql = String::from("WITH days(day, from_utc, until_utc) AS (VALUES ");
+            let mut values: Vec<rusqlite::types::Value> = Vec::with_capacity(days.len() * 3);
+            for (index, window) in days.iter().enumerate() {
+                if index > 0 {
+                    sql.push_str(", ");
+                }
+                let base = index * 3;
+                sql.push_str(&format!("(?{}, ?{}, ?{})", base + 1, base + 2, base + 3));
+                values.push(window.day.clone().into());
+                values.push(window.from.clone().into());
+                values.push(window.until.clone().into());
             }
+            sql.push_str(
+                ") SELECT days.day,
+                         COUNT(sessions.id),
+                         COALESCE(SUM(sessions.duration_seconds), 0) / 60
+                  FROM days
+                  LEFT JOIN focus_sessions AS sessions
+                    ON sessions.started_at >= days.from_utc
+                   AND sessions.started_at < days.until_utc
+                   AND sessions.completed = 1
+                   AND sessions.kind = 'focus'
+                  GROUP BY days.day",
+            );
+
+            let mut stmt = conn.prepare(&sql)?;
+            let rows = stmt.query_map(rusqlite::params_from_iter(values.iter()), |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, i64>(1)?,
+                    r.get::<_, i64>(2)?,
+                ))
+            })?;
+            let counted: HashMap<String, (i64, i64)> = rows
+                .map(|row| row.map(|(day, count, minutes)| (day, (count, minutes))))
+                .collect::<Result<_, _>>()?;
+
+            let daily_minutes: Vec<DailyFocus> = days
+                .iter()
+                .map(|window| {
+                    let (_, minutes) = counted.get(&window.day).copied().unwrap_or((0, 0));
+                    DailyFocus {
+                        date: window.day.clone(),
+                        minutes: minutes.max(0) as u32,
+                    }
+                })
+                .collect();
+
+            let minutes_of = |day: &str| -> i64 {
+                counted.get(day).map(|(_, minutes)| *minutes).unwrap_or(0)
+            };
+            let count_of = |day: &str| -> i64 {
+                counted.get(day).map(|(count, _)| *count).unwrap_or(0)
+            };
+
+            let total_completed: i64 = conn.query_row(
+                "SELECT COUNT(*) FROM focus_sessions WHERE completed = 1 AND kind = 'focus'",
+                [],
+                |r| r.get(0),
+            )?;
+
+            // The LEFT JOIN emits exactly one row per day, so summing `counted`
+            // is the same as summing the seven windows and cannot drift.
+            let week_counts: i64 = counted.values().map(|(count, _)| *count).sum();
+            let week_minutes: i64 = counted.values().map(|(_, minutes)| *minutes).sum();
 
             Ok(FocusStats {
-                completed_today: completed_today.max(0) as u32,
-                completed_week: completed_week.max(0) as u32,
+                completed_today: count_of(today_local).max(0) as u32,
+                completed_week: week_counts.max(0) as u32,
                 total_completed: total_completed.max(0) as u32,
-                focus_minutes_today: today_minutes.max(0) as u32,
-                focus_minutes_week: minutes.iter().map(|(_, m)| *m).sum::<i64>().max(0) as u32,
+                focus_minutes_today: minutes_of(today_local).max(0) as u32,
+                focus_minutes_week: week_minutes.max(0) as u32,
                 daily_minutes,
             })
         })
     }
+}
+
+/// One local day and the half-open UTC instant range that contains it.
+struct DayWindow {
+    day: String,
+    from: String,
+    until: String,
+}
+
+fn parse_local_day(value: &str) -> WolfResult<chrono::NaiveDate> {
+    chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| {
+        WolfError::invalid(format!("`{value}` is not a valid date (expected YYYY-MM-DD)."))
+    })
+}
+
+/// The first instant of a local day, as the fixed-width UTC string SQLite
+/// compares against.
+///
+/// Local midnight does not always exist: some zones move the clock forward at
+/// 00:00, so the first few hours are probed to keep stats working on those days
+/// instead of failing the whole screen.
+fn local_day_start(date: chrono::NaiveDate) -> WolfResult<String> {
+    for hour in 0..4 {
+        let Some(naive) = date.and_hms_opt(hour, 0, 0) else {
+            continue;
+        };
+        if let Some(local) = naive.and_local_timezone(chrono::Local).earliest() {
+            return Ok(local
+                .with_timezone(&chrono::Utc)
+                .to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
+        }
+    }
+    Err(WolfError::internal(format!(
+        "Could not work out when {date} starts in your timezone."
+    )))
 }
 
 fn validate_instant(raw: &str, field: &str) -> WolfResult<chrono::DateTime<chrono::Utc>> {
