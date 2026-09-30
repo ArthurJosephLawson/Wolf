@@ -301,6 +301,8 @@ export type StreamEvent =
 export interface AskRequest {
   model?: string | null;
   messages: ChatMessage[];
+  /** Pre-resolved `<local_context>` block; rebuilt natively when absent. */
+  context?: string | null;
   systemPrompt?: string | null;
   temperature?: number | null;
   numPredict?: number | null;

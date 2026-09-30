@@ -13,6 +13,7 @@ import { toAppError, WolfAppError } from "../errors";
 import {
   STATE_COPY,
   type AskRequest,
+  type AssistantContext,
   type ChatMessage,
   type ChatResponse,
   type OllamaModel,
@@ -25,6 +26,7 @@ export type {
   OllamaTransport,
   OllamaStatus,
   OllamaModel,
+  AssistantContext,
   ChatMessage,
   ChatResponse,
   StreamEvent,
@@ -109,6 +111,24 @@ export class OllamaClient {
   async isReady(overrides: Partial<OllamaClientConfig> = {}): Promise<boolean> {
     const status = await this.status(overrides);
     return status.state === "ready";
+  }
+
+  /**
+   * Resolve the `<local_context>` block and system prompt for a question.
+   *
+   * Purely a read: it assembles text from the local database and contacts no
+   * model. The assistant screen calls this before streaming so the context that
+   * will be sent is the one the user was shown, rather than a second
+   * independently built copy.
+   */
+  async assistantContext(query: string): Promise<AssistantContext | null> {
+    const trimmed = query.trim();
+    if (!trimmed) return null;
+    try {
+      return await this.transport.assistantContext(trimmed);
+    } catch (error) {
+      throw toAppError(error, "Wolf could not read your local data.");
+    }
   }
 
   /** One-shot question, no streaming. */

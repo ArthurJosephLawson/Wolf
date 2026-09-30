@@ -9,6 +9,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import type {
   AskAck,
   AskRequest,
+  AssistantContext,
   ChatMessage,
   ChatResponse,
   OllamaModel,
@@ -36,6 +37,10 @@ export const ollamaTransport: OllamaTransport = {
 
   async suggestedModel(): Promise<string> {
     return invoke<string>("suggested_model");
+  },
+
+  async assistantContext(query: string): Promise<AssistantContext> {
+    return invoke<AssistantContext>("assistant_context", { query });
   },
 
   async ask(prompt: string, history: ChatMessage[]): Promise<ChatResponse> {

@@ -131,10 +131,19 @@ export function AssistantPage() {
     try {
       const client = getOllamaClient();
       client.update({ url: settings.ollamaUrl, model: settings.ollamaModel });
+
+      // Resolve the context for this exact question first. It is a read-only
+      // local lookup, and sending the block we resolved here is what lets the
+      // assistant promise that the context it shows is the context it used.
+      const resolved = await client.assistantContext(prompt);
+      if (stopped) return;
+
       const dispose = await client.askStream(
         {
           model: settings.ollamaModel,
           messages: [...history, { role: "user", content: prompt }],
+          context: resolved?.context ?? null,
+          systemPrompt: resolved?.systemPrompt ?? null,
         },
         onEvent,
       );

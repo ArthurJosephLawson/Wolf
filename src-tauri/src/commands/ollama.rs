@@ -123,7 +123,14 @@ pub async fn ask_ollama_stream(
         return Err(WolfError::Ollama(err));
     }
 
-    let context = ai::build_context(&state.db, &last_prompt, today())?;
+    // A context supplied by the caller wins, so the assistant screen can show
+    // the user exactly which block was resolved before it is sent. Anything
+    // blank falls back to being rebuilt here, which keeps this command usable on
+    // its own.
+    let context = match request.context {
+        Some(c) if !c.trim().is_empty() => c,
+        _ => ai::build_context(&state.db, &last_prompt, today())?,
+    };
     let resolved_model = status.model.clone().unwrap_or(requested_model);
     let base_url = settings.ollama_url.clone();
 
@@ -158,6 +165,9 @@ pub struct AskRequest {
     #[serde(default)]
     pub model: Option<String>,
     pub messages: Vec<ChatMessage>,
+    /// Pre-resolved `<local_context>` block. Rebuilt server-side when absent.
+    #[serde(default)]
+    pub context: Option<String>,
     #[serde(default)]
     pub system_prompt: Option<String>,
     #[serde(default)]

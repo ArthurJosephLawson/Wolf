@@ -39,6 +39,12 @@ function transport(overrides: Partial<OllamaTransport> = {}): OllamaTransport {
     }),
     listModels: async () => [model("qwen2.5-coder:7b")],
     suggestedModel: async () => "qwen2.5-coder",
+    assistantContext: async (query) => ({
+      query,
+      intent: "tasks",
+      context: "<local_context>2 open tasks</local_context>",
+      systemPrompt: "You are Wolf.",
+    }),
     ask: async () => ({
       content: "ok",
       model: "m",

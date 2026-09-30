@@ -8,6 +8,7 @@
 import type {
   AskAck,
   AskRequest,
+  AssistantContext,
   ChatMessage,
   ChatResponse,
   OllamaModel,
@@ -18,6 +19,7 @@ import type {
 export type {
   AskAck,
   AskRequest,
+  AssistantContext,
   ChatMessage,
   ChatResponse,
   OllamaModel,
@@ -30,6 +32,8 @@ export interface OllamaTransport {
   status(url?: string | null, model?: string | null): Promise<OllamaStatus>;
   listModels(url?: string | null): Promise<OllamaModel[]>;
   suggestedModel(): Promise<string>;
+  /** Resolves the `<local_context>` block and system prompt for a question. */
+  assistantContext(query: string): Promise<AssistantContext>;
   ask(prompt: string, history?: ChatMessage[]): Promise<ChatResponse>;
   /** Opens a stream and returns an id; tokens arrive on `onEvent`. */
   askStream(
