@@ -1,6 +1,6 @@
 //! Process-wide application state shared by every Tauri command.
 
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 
 use tauri::{AppHandle, Manager, Runtime, State};
 
@@ -80,9 +80,3 @@ pub fn state<'a, R: Runtime>(app: &'a AppHandle<R>) -> WolfResult<State<'a, AppS
     app.try_state::<AppState>()
         .ok_or_else(|| WolfError::internal("Wolf is still starting up."))
 }
-
-/// Shared state handle type used inside `tauri::State` signatures.
-pub type SharedState<'r> = tauri::State<'r, AppState>;
-
-/// Marker for the Arc used by the reminder scheduler.
-pub type SchedulerHandle = Arc<()>;
