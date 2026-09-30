@@ -92,15 +92,6 @@
   }
 }
 
-@keyframes pixel-marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-
 .anim-fade-in {
   animation: pixel-fade-in 160ms steps(3, end) both;
 }
