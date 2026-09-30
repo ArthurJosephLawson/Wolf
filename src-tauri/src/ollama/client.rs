@@ -667,4 +667,87 @@ mod tests {
         assert_eq!(serde_json::to_string(&OllamaState::Offline).unwrap(), "\"offline\"");
         assert_eq!(serde_json::to_string(&OllamaState::Ready).unwrap(), "\"ready\"");
     }
+
+    #[test]
+    fn accepts_localhost_and_loopback_on_any_port() {
+        for base in [
+            "http://localhost:11434",
+            "http://localhost",
+            "http://127.0.0.1:11434",
+            "http://127.0.0.1:8080",
+        ] {
+            assert_eq!(validate_base_url(base).unwrap(), base, "{base} should be allowed");        }
+    }
+
+    #[test]
+    fn trims_whitespace_and_trailing_slash() {
+        assert_eq!(
+            validate_base_url("  http://localhost:11434/  ").unwrap(),
+            "http://localhost:11434"
+        );
+    }
+
+    #[test]
+    fn allows_a_host_written_in_a_different_case() {
+        assert_eq!(
+            validate_base_url("http://LocalHost:11434").unwrap(),
+            "http://LocalHost:11434"
+        );
+    }
+
+    #[test]
+    fn rejects_a_remote_host() {
+        let err = validate_base_url("http://ollama.example.com:11434").expect_err("should fail");
+        assert_eq!(err.kind(), "not_local");
+        assert!(err.to_string().contains("http://localhost"));
+    }
+
+    #[test]
+    fn rejects_a_host_that_only_looks_like_localhost() {
+        // A suffix or prefix match would let these through and leak every prompt
+        // to whoever controls the domain.
+        for base in [
+            "http://localhost.evil.example:11434",
+            "http://notlocalhost:11434",
+            "http://127.0.0.1.evil.example:11434",
+        ] {
+            let err = validate_base_url(base).expect_err("{base} should fail");
+            assert_eq!(err.kind(), "not_local", "{base} should fail");
+        }
+    }
+
+    #[test]
+    fn rejects_https_because_it_implies_a_tunnel() {
+        let err = validate_base_url("https://localhost:11434").expect_err("should fail");
+        assert_eq!(err.kind(), "not_local");
+    }
+
+    #[test]
+    fn rejects_a_non_loopback_ip() {
+        for base in ["http://192.168.1.10:11434", "http://[::1]:11434"] {
+            let err = validate_base_url(base).expect_err("should fail");
+            assert_eq!(err.kind(), "not_local", "{base} should fail");
+        }
+    }
+
+    #[test]
+    fn rejects_something_that_is_not_a_url() {
+        for base in ["", "   ", "ollama serve", "http://"] {
+            let err = validate_base_url(base).expect_err("should fail");
+            assert_eq!(err.kind(), "not_a_url", "{base} should fail");
+        }
+    }
+
+    #[test]
+    fn rejects_a_host_written_without_a_scheme() {
+        // Parses as scheme `localhost` and path `11434`, so it lands on the
+        // non-loopback branch rather than the unparseable one. Still refused.
+        let err = validate_base_url("localhost:11434").expect_err("should fail");
+        assert_eq!(err.kind(), "not_local");
+    }
+
+    #[test]
+    fn the_default_url_is_accepted() {
+        assert_eq!(validate_base_url(DEFAULT_OLLAMA_URL).unwrap(), DEFAULT_OLLAMA_URL);
+    }
 }
