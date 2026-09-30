@@ -32,16 +32,3 @@ pub struct AssistantContext {
     pub context: String,
     pub system_prompt: String,
 }
-
-/// Example questions shown in the empty assistant state.
-#[tauri::command]
-pub fn assistant_suggestions() -> Vec<String> {
-    vec![
-        "What do I have today?".to_string(),
-        "What tasks are overdue?".to_string(),
-        "When is my next meeting?".to_string(),
-        "What should I focus on next?".to_string(),
-        "How many focus sessions did I complete?".to_string(),
-        "Summarize my day.".to_string(),
-    ]
-}

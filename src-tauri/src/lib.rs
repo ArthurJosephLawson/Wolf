@@ -114,7 +114,6 @@ pub fn run() {
             commands::ollama::ask_ollama,
             commands::ollama::ask_ollama_stream,
             commands::assistant::assistant_context,
-            commands::assistant::assistant_suggestions,
             // Desktop integration
             commands::desktop::show_main_window,
             commands::desktop::hide_main_window,
