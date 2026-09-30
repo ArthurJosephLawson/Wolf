@@ -36,6 +36,10 @@ export function minutesUntil(startTime: string, now: Date): number {
  * dropped so a slow sweep cannot show the same reminder twice, and an event
  * that has already started is dropped so a delayed sweep stays quiet rather
  * than announcing something already in progress.
+ *
+ * The comparison is `>=` rather than `>` so a reminder configured for zero
+ * minutes still fires when the sweep lands exactly on the start, which is also
+ * what `eventSoon` renders as "Starting now".
  */
 export function pendingReminders(
   events: ReminderEvent[],
@@ -45,7 +49,7 @@ export function pendingReminders(
     .filter((event) => event.notifiedAt === null)
     .filter((event) => {
       const start = parseDateTimeKey(event.startTime).getTime();
-      return !Number.isNaN(start) && start > now.getTime();
+      return !Number.isNaN(start) && start >= now.getTime();
     })
     .sort(
       (a, b) =>
