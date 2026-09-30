@@ -195,7 +195,8 @@ describe("asking", () => {
     expect(typeof dispose).toBe("function");
   });
 
-  it("keeps delivering tokens that arrive after the ack resolves", async () => {    // The native side acknowledges the request and then streams in the
+  it("keeps delivering tokens that arrive after the ack resolves", async () => {
+    // The native side acknowledges the request and then streams in the
     // background, so the listener has to outlive the awaited promise.
     let deliver: ((event: StreamEvent) => void) | null = null;
     const client = new OllamaClient({

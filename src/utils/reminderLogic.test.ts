@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { minutesUntil, pendingReminders, type ReminderEvent } from "./reminderLogic";
+import {
+  minutesUntil,
+  pendingReminders,
+  type ReminderEvent,
+} from "./reminderLogic";
 
 function event(overrides: Partial<ReminderEvent> = {}): ReminderEvent {
   return {

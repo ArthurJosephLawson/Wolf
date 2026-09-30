@@ -139,10 +139,7 @@ export function App() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [
-    settings.eventRemindersEnabled,
-    settings.notificationsEnabled,
-  ]);
+  }, [settings.eventRemindersEnabled, settings.notificationsEnabled]);
 
   // Tray menu and companion errors arrive as Tauri events. `listen` resolves
   // asynchronously, so the disposers are collected into a mutable holder and

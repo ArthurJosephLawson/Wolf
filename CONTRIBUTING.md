@@ -84,7 +84,7 @@ argument key the Rust signature does not accept. Tauri resolves both at runtime,
 so a typo there is otherwise a production-only failure.
 
 **Settings are one JSON blob.** Adding a field means adding it in
-`src-tauri/src/models/settings.rs` *and* `src/types/index.ts` *and*
+`src-tauri/src/models/settings.rs` _and_ `src/types/index.ts` _and_
 `src/stores/settingsStore.ts`. Nothing tests that the two default copies agree, so
 if you add a setting, check both by hand. Old databases will still load: Serde
 ignores fields it does not know.
