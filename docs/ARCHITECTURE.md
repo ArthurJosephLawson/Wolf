@@ -23,12 +23,19 @@ discipline:
 
 ## The IPC boundary
 
-`src/services/desktop/bridge.ts` is the only file that calls `invoke`. It detects the
-Tauri runtime via `__TAURI_INTERNALS__`, because `withGlobalTauri` is `false` — the
+`src/services/desktop/bridge.ts` is where almost every `invoke` call lives. It detects
+the Tauri runtime via `__TAURI_INTERNALS__`, because `withGlobalTauri` is `false` — the
 global `__TAURI__` namespace does not exist in this configuration, so detecting it would
 have made the app think it was running in a browser while sitting in a real webview.
 
-When the shell is absent, `invoke` rejects with an explanatory error. That is what makes
+The one other caller is `src/services/ollama/transport.ts`, which calls `invoke` directly
+for the five Ollama commands. It has to: the streaming path needs a `Channel` object that
+`bridge.ts` does not model, and keeping the assistant behind an `OllamaTransport`
+interface is what lets `OllamaClient.test.ts` run against a fake. The trade-off is that
+those command names are written in two places, so `ipcContract.test.ts` checks them
+against the Rust `invoke_handler` list.
+
+When the shell is absent, `bridge.ts` rejects with an explanatory error. That is what makes
 `npm run dev:web` degrade into a labelled "desktop unavailable" view instead of a blank
 screen. The fallback is a deliberate development affordance, not a supported mode.
 
