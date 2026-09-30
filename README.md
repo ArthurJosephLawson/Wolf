@@ -23,7 +23,7 @@ accounts, no telemetry, no network calls except to localhost.
   your own data injected as context so you can ask "what's overdue?" or "how are my
   habits?" without leaving the app.
 - **Companion**  a transparent, always-on-top, draggable pixel window whose pose
-  reflects what the app is doing. Built from a hand-authored 24x26 sprite matrix.
+  reflects what the app is doing. Built from a hand-authored 28x28 sprite matrix.
 - **Desktop integration**  system tray with real actions, close-to-tray, notifications
   for task reminders and finished focus sessions, keyboard shortcuts `1`-`7` to switch
   screens.

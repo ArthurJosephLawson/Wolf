@@ -71,12 +71,12 @@ without assuming a single store exists.
 
 ## Sprite pipeline
 
-The wolf is a 24x26 character matrix with a named palette, not a set of PNGs:
+The wolf is a 28x28 character matrix with a named palette, not a set of PNGs:
 
 1. `wolf-pixels.json` holds the base matrix, the palette, and the per-state overlays.
 2. `sprites.ts` validates the data (unknown pixel characters are an error), then
    flattens matrices into SVG run strings grouped by fill colour, so a frame is a
-   handful of `<rect>` elements instead of 624 nodes.
+   handful of `<rect>` elements instead of 784 nodes.
 3. `WolfSprite.tsx` renders those runs.
 4. `scripts/generate-icons.mjs` rasterises the same matrix into the app and tray PNGs, so
    the window icon and the in-app wolf cannot drift apart.
