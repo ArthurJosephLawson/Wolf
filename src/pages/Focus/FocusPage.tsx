@@ -44,7 +44,7 @@ export function FocusPage() {
     return () => window.clearInterval(id);
   }, [running]);
 
-  // Celebrate a phase change once, then acknowledge it.
+  // Acknowledge clears `lastCompletedPhase`, so this fires once per phase.
   useEffect(() => {
     if (focus.lastCompletedPhase === null) return;
     useWolfStore.getState().pushShared("all-clear");

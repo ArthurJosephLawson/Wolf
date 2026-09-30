@@ -41,7 +41,7 @@ export function TasksPage() {
 
   useEffect(() => {
     void store.load();
-    // Load once on mount; the store is a singleton.
+    // Mount only: the store is a singleton and reloads itself on mutation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

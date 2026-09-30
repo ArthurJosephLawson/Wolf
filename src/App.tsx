@@ -95,7 +95,8 @@ export function App() {
     return () => window.clearInterval(id);
   }, []);
 
-  // Focus store keeps its own copy of the durations.
+  // The focus store holds its own copy of the durations, so the companion
+  // window's copy stays correct without a round trip to SQLite.
   useEffect(() => {
     useFocusStore.getState().init(settings);
   }, [settings]);
@@ -205,7 +206,7 @@ export function App() {
     }
   }, [route]);
 
-  // Route with a keyboard shortcut: 1-7, ignoring text fields.
+  // Number keys 1-7 select a screen, except while a text field has focus.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey || event.altKey) return;

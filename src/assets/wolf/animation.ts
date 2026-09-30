@@ -18,7 +18,7 @@ import type { WolfState } from "./sprites";
 export const FRAME_DURATIONS: Record<WolfState, readonly number[]> = {
   // 1200ms cycle with a 200ms hold on the fully inflated frame.
   idle: [300, 350, 200, 350],
-  // 100ms per frame, as specified.
+  // 100ms per frame: a blink has to read as instant at any size.
   blink: [100, 100, 100],
   // Fast, so speech reads as continuous chattering.
   speaking: [120, 120, 120, 120],

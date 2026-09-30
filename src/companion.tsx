@@ -16,8 +16,8 @@ document.body.dataset.window = "companion";
 const container = document.getElementById("root");
 if (!container) throw new Error("Wolf could not find its root element.");
 
-// The companion needs the same preferences as the main window (scale, name,
-// theme) but no data, so it only loads settings.
+// The companion needs the same preferences as the main window (scale, name)
+// but none of its data, so it only loads settings.
 void useSettingsStore.getState().load();
 
 createRoot(container).render(

@@ -62,7 +62,7 @@ export function HomePage() {
     overdue: counts.overdue,
   });
 
-  // The wolf's resting pose follows the real day: clear, normal, or busy.
+  // The resting pose tracks the real day, but never overrides a running timer.
   useEffect(() => {
     if (focusView.running) return;
     useWolfStore

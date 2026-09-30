@@ -280,7 +280,6 @@ const EAR_BOTTOM = 4;
 const EAR_LEFT_COL = 8;
 const EAR_RIGHT_COL = 16;
 
-/** Head and muzzle, rows 5-18. */
 const HEAD_TOP = 5;
 const HEAD_BOTTOM = 18;
 
@@ -332,13 +331,11 @@ function applyEyes(matrix: Matrix, patch: EyePatch): Matrix {
 
 /* -------------------------------------------------------------- overlays --- */
 
-/** Celebration sparkle. */
 const SPARKLE: Matrix = [".W.", "WWW", ".W."];
 /** A 3x3 heart that floats up and shrinks as it fades. */
 const HEART: Matrix = ["P.P", "PPP", ".P."];
 /** A single heart pixel, standing in for the faded tail of the heart. */
 const HEART_TAIL: Matrix = ["P"];
-/** White breath leaving the mouth. */
 const BREATH: Matrix = [".W.", "W..", "..W"];
 /** The 3x3 attention ripple used while listening. */
 const SOUND: Matrix = [".L", "LL", "L."];
