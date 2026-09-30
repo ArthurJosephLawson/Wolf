@@ -496,6 +496,38 @@ fn ollama_reported_error(message: &str) -> WolfError {
     OllamaError::Transport(format!("Ollama reported: {message}")).into()
 }
 
+/// Hostnames Wolf accepts for the daemon. A literal check rather than a suffix
+/// match, so `localhost.evil.example` cannot pass.
+const LOCAL_HOSTS: [&str; 2] = ["localhost", "127.0.0.1"];
+
+/// Reject any base URL that is not a plain-HTTP loopback address.
+///
+/// The port is deliberately unrestricted because `ollama serve` can be moved
+/// with `OLLAMA_HOST`, but the host is not: Wolf's privacy promise is that
+/// nothing leaves the machine, and a remote `ollama_url` in settings would send
+/// every prompt, task and habit to that host. The scheme is restricted to
+/// `http` for the same reason — `https://localhost` implies a tunnel or proxy
+/// that would break that promise.
+///
+/// Returns the trimmed base (no trailing slash) so callers can store exactly
+/// what was validated.
+pub fn validate_base_url(raw: &str) -> WolfResult<String> {
+    let trimmed = raw.trim().trim_end_matches('/');
+    if trimmed.is_empty() {
+        return Err(OllamaError::NotAUrl { value: raw.to_string() }.into());
+    }
+
+    let parsed = reqwest::Url::parse(trimmed)
+        .map_err(|_| OllamaError::NotAUrl { value: trimmed.to_string() })?;
+
+    let host = parsed.host_str().unwrap_or_default().to_ascii_lowercase();
+    if parsed.scheme() != "http" || !LOCAL_HOSTS.contains(&host.as_str()) {
+        return Err(OllamaError::NotLocal { host: trimmed.to_string() }.into());
+    }
+
+    Ok(trimmed.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

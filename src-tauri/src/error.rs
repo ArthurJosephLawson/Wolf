@@ -15,6 +15,10 @@ pub enum OllamaError {
     NoModels { suggestion: String },
     #[error("Model `{model}` is not installed on this machine. Installed models: {available}.")]
     ModelNotFound { model: String, available: String },
+    #[error("Wolf only talks to a local Ollama daemon, so the address has to be http://localhost or http://127.0.0.1 (any port). `{host}` is not one of those.")]
+    NotLocal { host: String },
+    #[error("`{value}` is not a valid URL. Use something like http://localhost:11434.")]
+    NotAUrl { value: String },
     #[error("Ollama returned an unexpected response ({status}).")]
     BadStatus { status: u16 },
     #[error("Ollama sent a response Wolf could not read.")]
@@ -32,6 +36,8 @@ impl OllamaError {
             OllamaError::Unavailable { .. } => "unavailable",
             OllamaError::NoModels { .. } => "no_models",
             OllamaError::ModelNotFound { .. } => "model_not_found",
+            OllamaError::NotLocal { .. } => "not_local",
+            OllamaError::NotAUrl { .. } => "not_a_url",
             OllamaError::BadStatus { .. } => "bad_status",
             OllamaError::Malformed => "malformed",
             OllamaError::Transport(_) => "transport",
