@@ -31,7 +31,7 @@ a few minutes, but incremental changes to the app are quick.
 3. **Command** in `src-tauri/src/commands/`. A thin adapter: unpack args, call the
    repository, wrap the error. No branching logic.
 4. **Service method** in `src/services/`. The only place the command name appears.
-5. **Store action** in `src/stores/`. Holds no rendering concerns.
+5. **Store action** in `src/features/<domain>/`. Holds no rendering concerns.
 6. **Component or page**. Reads from the store, dispatches actions.
 
 If a new field must be shared between windows, add it to `SettingsPatch` as well, or the
@@ -42,7 +42,7 @@ companion will clobber it.
 - Anything with a branch on user input: pure function, test it directly.
 - Anything involving time: inject the timestamp. The existing `date.ts` and
   `timerLogic.ts` are testable precisely because they take `now` as an argument.
-- Anything talking to the network: stub `fetch`. See `src/services/ollama/OllamaClient.test.ts`.
+- Anything talking to the network: stub `fetch`. See `src/features/assistant/OllamaClient.test.ts`.
 - Anything reading the database: `crate::database::test_support::test_db()` gives you an
   in-memory database with migrations applied.
 

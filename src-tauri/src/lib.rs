@@ -4,7 +4,7 @@
 //! directory, AI through a locally running Ollama, notifications through the
 //! freedesktop D-Bus service. There is no telemetry and no cloud dependency.
 
-pub mod ai;
+pub mod assistant;
 pub mod commands;
 pub mod database;
 pub mod error;

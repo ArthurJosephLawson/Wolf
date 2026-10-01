@@ -6,7 +6,7 @@
 
 use tauri::State;
 
-use crate::ai;
+use crate::assistant;
 use crate::commands::today;
 use crate::error::WolfResult;
 use crate::state::AppState;
@@ -17,13 +17,13 @@ pub fn assistant_context(
     state: State<'_, AppState>,
     query: String,
 ) -> WolfResult<AssistantContext> {
-    let context = ai::build_context(&state.db, &query, today())?;
-    let intent = ai::classify_intent(&query).label().to_string();
+    let context = assistant::build_context(&state.db, &query, today())?;
+    let intent = assistant::classify_intent(&query).label().to_string();
     Ok(AssistantContext {
         query,
         intent,
         context,
-        system_prompt: ai::system_prompt(),
+        system_prompt: assistant::system_prompt(),
     })
 }
 

@@ -24,11 +24,7 @@
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
 
-    "types": ["vite/client", "node"],
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    }
+    "types": ["vite/client", "node"]
   },
   "include": ["src", "vite.config.ts", "eslint.config.js"]
 }

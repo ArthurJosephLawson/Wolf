@@ -1,0 +1,17 @@
+import { invoke } from "./ipc";
+import type { Settings } from "../types";
+
+export const settingsService = {
+  get(): Promise<Settings> {
+    return invoke<Settings>("get_settings");
+  },
+
+  save(settings: Settings): Promise<Settings> {
+    return invoke<Settings>("save_settings", { settings });
+  },
+
+  /** Resolve a friendly model name to the installed tag and persist it. */
+  selectModel(model: string): Promise<Settings> {
+    return invoke<Settings>("select_model", { model });
+  },
+};

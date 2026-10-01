@@ -78,14 +78,15 @@ A few decisions in this codebase look odd until you know the reason. They are
 written down at the site, and this is the short version.
 
 **The frontend never calls `invoke` directly.** Everything goes through
-`src/services/desktop/`. `ipcContract.test.ts` parses both sides of that boundary
+`src/services/`. `src/services/ipcContract.test.ts` parses both sides of that boundary
 and fails if the frontend calls a command Rust does not register, or passes an
 argument key the Rust signature does not accept. Tauri resolves both at runtime,
 so a typo there is otherwise a production-only failure.
 
 **Settings are one JSON blob.** Adding a field means adding it in
 `src-tauri/src/models/settings.rs` _and_ `src/types/index.ts` _and_
-`src/stores/settingsStore.ts`. Nothing tests that the two default copies agree, so
+`src/features/settings/settingsStore.ts`. Nothing tests that the two default copies
+agree, so
 if you add a setting, check both by hand. Old databases will still load: Serde
 ignores fields it does not know.
 
@@ -115,7 +116,7 @@ shape, and pass `now` in rather than reading the clock.
 
 Neither suite needs a display, a running Ollama daemon, or a database file. The
 Rust tests run real migrations against in-memory SQLite, so if you touch
-`migrations/`, the Rust tests are the place to prove it still applies.
+`src-tauri/migrations/`, the Rust tests are the place to prove it still applies.
 
 Name a test after the invariant it protects, not the function it calls. A failing
 test should tell you what broke without opening the file:

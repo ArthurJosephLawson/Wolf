@@ -115,7 +115,7 @@ impl ChatRequest {
         let system = self
             .system_prompt
             .clone()
-            .unwrap_or_else(crate::ai::system_prompt);
+            .unwrap_or_else(crate::assistant::system_prompt);
 
         let mut system_text = system;
         if !self.context.trim().is_empty() {

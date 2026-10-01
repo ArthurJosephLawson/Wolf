@@ -1,7 +1,7 @@
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State};
 
-use crate::ai;
+use crate::assistant;
 use crate::commands::today;
 use crate::error::{OllamaError, WolfError, WolfResult};
 use crate::models::ollama::{
@@ -50,12 +50,12 @@ pub async fn ask_ollama(
         return Err(WolfError::invalid("Ask Wolf something first."));
     }
     let settings = state.settings();
-    let context = ai::build_context(&state.db, &prompt, today())?;
+    let context = assistant::build_context(&state.db, &prompt, today())?;
     let request = ChatRequest {
         model: settings.ollama_model.clone(),
         messages: history.unwrap_or_default(),
         context,
-        system_prompt: Some(ai::system_prompt()),
+        system_prompt: Some(assistant::system_prompt()),
         // Local models are literal; a touch of determinism keeps answers stable.
         temperature: Some(0.2),
         num_predict: Some(512),
@@ -132,7 +132,7 @@ pub async fn ask_ollama_stream(
     // its own.
     let context = match request.context {
         Some(c) if !c.trim().is_empty() => c,
-        _ => ai::build_context(&state.db, &last_prompt, today())?,
+        _ => assistant::build_context(&state.db, &last_prompt, today())?,
     };
     let resolved_model = status.model.clone().unwrap_or(requested_model);
     let base_url = settings.ollama_url.clone();
@@ -141,7 +141,9 @@ pub async fn ask_ollama_stream(
         model: resolved_model,
         messages: request.messages,
         context,
-        system_prompt: request.system_prompt.or_else(|| Some(ai::system_prompt())),
+        system_prompt: request
+            .system_prompt
+            .or_else(|| Some(assistant::system_prompt())),
         temperature: Some(request.temperature.unwrap_or(0.2)),
         num_predict: Some(request.num_predict.unwrap_or(512)),
         keep_alive: None,

@@ -12,13 +12,10 @@ use rusqlite::Connection;
 use crate::error::{WolfError, WolfResult};
 
 const MIGRATIONS: &[(&str, &str)] = &[
-    (
-        "0001_init",
-        include_str!("../../../migrations/0001_init.sql"),
-    ),
+    ("0001_init", include_str!("../../migrations/0001_init.sql")),
     (
         "0002_settings",
-        include_str!("../../../migrations/0002_settings.sql"),
+        include_str!("../../migrations/0002_settings.sql"),
     ),
 ];
 

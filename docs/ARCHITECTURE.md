@@ -23,19 +23,19 @@ discipline:
 
 ## The IPC boundary
 
-`src/services/desktop/bridge.ts` is where almost every `invoke` call lives. It detects
+`src/services/ipc.ts` is where almost every `invoke` call lives. It detects
 the Tauri runtime via `__TAURI_INTERNALS__`, because `withGlobalTauri` is `false` — the
 global `__TAURI__` namespace does not exist in this configuration, so detecting it would
 have made the app think it was running in a browser while sitting in a real webview.
 
-The one other caller is `src/services/ollama/transport.ts`, which calls `invoke` directly
+The one other caller is `src/services/ollama.ts`, which calls `invoke` directly
 for the five Ollama commands. It has to: the streaming path needs a `Channel` object that
-`bridge.ts` does not model, and keeping the assistant behind an `OllamaTransport`
+`ipc.ts` does not model, and keeping the assistant behind an `OllamaTransport`
 interface is what lets `OllamaClient.test.ts` run against a fake. The trade-off is that
 those command names are written in two places, so `ipcContract.test.ts` checks them
 against the Rust `invoke_handler` list.
 
-When the shell is absent, `bridge.ts` rejects with an explanatory error. That is what makes
+When the shell is absent, `ipc.ts` rejects with an explanatory error. That is what makes
 `npm run dev:web` degrade into a labelled "desktop unavailable" view instead of a blank
 screen. The fallback is a deliberate development affordance, not a supported mode.
 
@@ -51,7 +51,7 @@ State lives in exactly one place per domain, and always the same one:
 | Wolf pose                             | In-memory, derived from the above           | Pure UI reaction, nothing to persist             |
 | Chat transcript                       | In-memory                                   | Deliberately not persisted                       |
 
-The timer is the interesting case. `src/utils/timerLogic.ts` is a pure function of
+The timer is the interesting case. `src/features/focus/timerLogic.ts` is a pure function of
 `(snapshot, action, now)`. React only supplies `now` on a 250 ms interval, and the store
 persists exactly once per phase transition. That is why the timer survives a remount
 without drift, and why it can be tested without a fake clock library.
@@ -93,7 +93,7 @@ composited the frame background into the sprite.
 
 ## AI context
 
-`ai/mod.rs` classifies the question into a small intent enum, then assembles only the
+`assistant/mod.rs` classifies the question into a small intent enum, then assembles only the
 sections that intent needs. Asking about overdue tasks does not load the calendar, and
 neither loads the full task table — `tasks_section` filters in SQL.
 
@@ -104,7 +104,8 @@ localhost.
 
 ## Migrations
 
-`database/migrator.rs` embeds the `migrations/*.sql` files with `include_str!` and
+`database/migrator.rs` embeds the `src-tauri/migrations/*.sql` files with
+`include_str!` and
 applies them in the order they appear in its `MIGRATIONS` array — not sorted at
 runtime. Each one runs inside a transaction and is recorded in
 `schema_migrations`. Startup is therefore idempotent, and a new version is a new

@@ -14,7 +14,7 @@
  * verified by `scripts/check-sprite.mjs` and `sprites.test.ts`.
  */
 
-import spriteData from "../../assets/wolf/wolf-pixels.json";
+import spriteData from "./wolf-pixels.json";
 
 export type Pixel = string;
 
