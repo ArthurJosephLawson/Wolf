@@ -1,12 +1,5 @@
-//! Typed error hierarchy for the Wolf backend.
-//!
-//! Every error that can reach the UI is converted into a serialisable
-//! [`WolfError`]. The frontend renders `message` verbatim, so messages must be
-//! written for humans: no stack traces, no raw HTTP dumps, no SQL strings.
-
 use serde::{Serialize, Serializer};
 
-/// Failures coming from the local Ollama runtime.
 #[derive(Debug, thiserror::Error)]
 pub enum OllamaError {
     #[error("Ollama is not running at {url}. Start it with `ollama serve`.")]
@@ -30,7 +23,6 @@ pub enum OllamaError {
 }
 
 impl OllamaError {
-    /// Stable machine-readable discriminator used by the UI to pick a state.
     pub fn kind(&self) -> &'static str {
         match self {
             OllamaError::Unavailable { .. } => "unavailable",
@@ -46,7 +38,6 @@ impl OllamaError {
     }
 }
 
-/// Top level backend error.
 #[derive(Debug, thiserror::Error)]
 pub enum WolfError {
     #[error("Local database error: {0}")]
@@ -64,7 +55,6 @@ pub enum WolfError {
     #[error("Desktop integration unavailable: {0}")]
     Desktop(String),
 
-    /// Anything Tauri itself reports (window creation, menu, tray).
     #[error("Desktop integration failed: {0}")]
     Tauri(#[from] tauri::Error),
 
@@ -89,7 +79,6 @@ impl WolfError {
         WolfError::Desktop(message.into())
     }
 
-    /// Stable machine-readable discriminator used by the UI.
     pub fn kind(&self) -> &'static str {
         match self {
             WolfError::Database(_) => "database",

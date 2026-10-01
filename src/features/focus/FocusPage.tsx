@@ -1,9 +1,3 @@
-/**
- * Focus screen.
- *
- * One 250ms interval drives the pure state machine; the store persists sessions
- * and fires the completion notification exactly once.
- */
 import { useEffect } from "react";
 import { Panel, ErrorNote, Empty, Stat } from "../../components/ui";
 import { TimerDisplay } from "./TimerDisplay";
@@ -22,8 +16,6 @@ export function FocusPage() {
   const settings = useSettingsStore((s) => s.settings);
   const durations = useFocusDurations();
 
-  // Hand the focus store the current durations. Read through `getState` so the
-  // effect only re-runs when the settings object itself changes.
   useEffect(() => {
     useFocusStore.getState().init(settings);
   }, [settings]);
@@ -32,7 +24,6 @@ export function FocusPage() {
     void useFocusStore.getState().refresh();
   }, []);
 
-  // A single interval for the whole app, only while the timer is running.
   useEffect(() => {
     if (!running) return;
     const id = window.setInterval(() => {
@@ -41,7 +32,6 @@ export function FocusPage() {
     return () => window.clearInterval(id);
   }, [running]);
 
-  // Acknowledge clears `lastCompletedPhase`, so this fires once per phase.
   useEffect(() => {
     if (focus.lastCompletedPhase === null) return;
     useWolfStore.getState().pushShared("all-clear");

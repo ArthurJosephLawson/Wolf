@@ -1,9 +1,3 @@
-/**
- * Task repository access.
- *
- * The UI never talks to SQLite; it calls a service, which calls a Tauri command,
- * which calls a Rust repository. Every function here is a thin, typed adapter.
- */
 import { invoke } from "./ipc";
 import type {
   NewTask,

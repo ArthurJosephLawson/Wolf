@@ -32,7 +32,7 @@ pub fn delete_focus_session(state: State<'_, AppState>, id: String) -> WolfResul
 pub fn focus_stats(state: State<'_, AppState>) -> WolfResult<FocusStats> {
     let day = today();
     let today_str = day.format("%Y-%m-%d").to_string();
-    // The sparkline always shows a dense 7-day window, not a calendar week.
+
     let window_start = (day - chrono::Duration::days(6))
         .format("%Y-%m-%d")
         .to_string();

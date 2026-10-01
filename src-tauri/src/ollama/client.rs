@@ -1,9 +1,3 @@
-//! Local Ollama REST client.
-//!
-//! Wolf talks to a locally running `ollama serve` and nothing else. There is no
-//! cloud fallback, no API key, no proxy: if the daemon is down the user is told
-//! so plainly.
-
 use std::time::Duration;
 
 use futures_util::StreamExt;
@@ -17,15 +11,13 @@ use crate::models::ollama::{
     StreamDone,
 };
 
-/// Default local endpoint, matching a stock `ollama serve`.
 pub const DEFAULT_OLLAMA_URL: &str = "http://localhost:11434";
-/// Model suggested to the user when nothing is installed.
+
 pub const SUGGESTED_MODEL: &str = "qwen2.5-coder";
 
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(1_500);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(180);
 
-/// One NDJSON frame emitted by `/api/chat` with `"stream": true`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChatChunk {
     #[serde(default)]
@@ -45,7 +37,6 @@ pub struct ChatChunk {
 }
 
 impl ChatChunk {
-    /// Ollama returns either `message.content` or the legacy `response` field.
     pub fn text(&self) -> Option<&str> {
         self.message
             .as_ref()
@@ -91,18 +82,19 @@ struct VersionResponse {
     version: String,
 }
 
-/// Payload sent to the frontend for each streamed token batch.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum StreamEvent {
-    /// Incremental text, already decoded from the NDJSON frame.
-    Token { request_id: String, text: String },
-    /// Terminal payload with timing metadata.
+    Token {
+        request_id: String,
+        text: String,
+    },
+
     Done {
         request_id: String,
         summary: StreamDone,
     },
-    /// The stream ended early; `message` is safe to show to the user.
+
     Failed {
         request_id: String,
         message: String,
@@ -125,7 +117,6 @@ impl OllamaClient {
         let http = reqwest::Client::builder()
             .connect_timeout(CONNECT_TIMEOUT)
             .timeout(REQUEST_TIMEOUT)
-            // Wolf never follows redirects to somewhere other than the local daemon.
             .redirect(reqwest::redirect::Policy::none())
             .user_agent(concat!("Wolf/", env!("CARGO_PKG_VERSION")))
             .build()
@@ -146,14 +137,13 @@ impl OllamaClient {
                 url: base.to_string(),
             };
         }
-        // Body/decode failures point at an incompatible daemon, not at the network.
+
         if err.is_decode() || err.is_body() {
             return OllamaError::Malformed;
         }
         OllamaError::Transport(err.to_string())
     }
 
-    /// `GET /api/version` — the cheapest possible reachability probe.
     pub async fn version(&self, base: &str) -> WolfResult<String> {
         let response = self
             .http
@@ -176,7 +166,6 @@ impl OllamaClient {
         Ok(body.version)
     }
 
-    /// `GET /api/tags` — every model installed on this machine.
     pub async fn list_models(&self, base: &str) -> WolfResult<Vec<OllamaModel>> {
         let response = self
             .http
@@ -214,8 +203,6 @@ impl OllamaClient {
             .collect())
     }
 
-    /// Resolve a user-typed model name against the installed list.
-    /// `qwen2.5-coder` matches the installed `qwen2.5-coder:7b-instruct`.
     pub fn resolve_model(models: &[OllamaModel], requested: &str) -> Option<String> {
         let wanted = requested.trim().to_lowercase();
         if wanted.is_empty() {
@@ -231,7 +218,6 @@ impl OllamaClient {
             .map(|m| m.name.clone())
     }
 
-    /// Health probe that classifies the daemon into the four UI states.
     pub async fn status(&self, base: &str, model: &str) -> WolfResult<OllamaStatus> {
         let checked_at = crate::models::now_iso();
         let url = base.trim_end_matches('/').to_string();
@@ -319,8 +305,6 @@ impl OllamaClient {
         serde_json::Value::Object(body)
     }
 
-    /// Build the chat request. Kept separate from sending so both the streaming
-    /// and one-shot paths share exactly one body shape.
     fn send_chat(
         &self,
         base: &str,
@@ -342,7 +326,6 @@ impl OllamaClient {
         Ok(())
     }
 
-    /// Non-streaming completion. Used for short contextual lookups and tests.
     pub async fn chat(&self, base: &str, request: &ChatRequest) -> WolfResult<ChatResponse> {
         Self::model_guard(request)?;
 
@@ -381,8 +364,6 @@ impl OllamaClient {
         })
     }
 
-    /// Streaming completion. Tokens are pushed to the frontend over `channel`
-    /// as they arrive; the function returns as soon as the stream is exhausted.
     pub async fn chat_stream(
         &self,
         base: &str,
@@ -440,7 +421,6 @@ impl OllamaClient {
 
             buffer.push_str(&String::from_utf8_lossy(&bytes));
 
-            // NDJSON: one JSON object per line, the tail may be incomplete.
             while let Some(idx) = buffer.find('\n') {
                 let line: String = buffer.drain(..=idx).collect();
                 let line = line.trim();
@@ -469,7 +449,6 @@ impl OllamaClient {
                                 })
                                 .is_err()
                             {
-                                // The window went away; stop burning CPU on tokens.
                                 break 'outer;
                             }
                         }
@@ -484,8 +463,6 @@ impl OllamaClient {
                         }
                     }
                     Err(_) => {
-                        // A malformed frame is reported but does not abort a
-                        // stream that is otherwise producing good tokens.
                         log::warn!("ignoring malformed Ollama stream frame");
                     }
                 }
@@ -501,7 +478,6 @@ impl OllamaClient {
                 Ok(())
             }
             None => {
-                // Stream ended without a `done` frame: still a usable answer.
                 let summary = StreamDone {
                     request_id: request_id.to_string(),
                     model,
@@ -518,28 +494,13 @@ impl OllamaClient {
     }
 }
 
-/// Ollama can answer 200 with an `error` field (e.g. a missing model). Surface
-/// that text instead of the opaque status code.
 fn ollama_reported_error(message: &str) -> WolfError {
     log::warn!("ollama reported: {message}");
     OllamaError::Transport(format!("Ollama reported: {message}")).into()
 }
 
-/// Hostnames Wolf accepts for the daemon. A literal check rather than a suffix
-/// match, so `localhost.evil.example` cannot pass.
 const LOCAL_HOSTS: [&str; 2] = ["localhost", "127.0.0.1"];
 
-/// Reject any base URL that is not a plain-HTTP loopback address.
-///
-/// The port is deliberately unrestricted because `ollama serve` can be moved
-/// with `OLLAMA_HOST`, but the host is not: Wolf's privacy promise is that
-/// nothing leaves the machine, and a remote `ollama_url` in settings would send
-/// every prompt, task and habit to that host. The scheme is restricted to
-/// `http` for the same reason — `https://localhost` implies a tunnel or proxy
-/// that would break that promise.
-///
-/// Returns the trimmed base (no trailing slash) so callers can store exactly
-/// what was validated.
 pub fn validate_base_url(raw: &str) -> WolfResult<String> {
     let trimmed = raw.trim().trim_end_matches('/');
     if trimmed.is_empty() {
@@ -766,8 +727,6 @@ mod tests {
 
     #[test]
     fn rejects_a_host_that_only_looks_like_localhost() {
-        // A suffix or prefix match would let these through and leak every prompt
-        // to whoever controls the domain.
         for base in [
             "http://localhost.evil.example:11434",
             "http://notlocalhost:11434",
@@ -802,8 +761,6 @@ mod tests {
 
     #[test]
     fn rejects_a_host_written_without_a_scheme() {
-        // Parses as scheme `localhost` and path `11434`, so it lands on the
-        // non-loopback branch rather than the unparseable one. Still refused.
         let err = validate_base_url("localhost:11434").expect_err("should fail");
         assert_eq!(err.kind(), "not_local");
     }

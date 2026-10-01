@@ -28,7 +28,6 @@ export const habitService = {
     return invoke<void>("delete_habit", { id });
   },
 
-  /** `date` defaults to today on the Rust side. */
   complete(habitId: string, date?: string): Promise<HabitCompletion> {
     return invoke<HabitCompletion>("complete_habit", {
       habitId,

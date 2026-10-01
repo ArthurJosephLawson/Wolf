@@ -1,10 +1,3 @@
-/**
- * Assistant screen.
- *
- * Talks to a locally running Ollama daemon. There is no cloud path: if the
- * daemon is not up, the screen explains exactly what to start, and the rest of
- * Wolf keeps working.
- */
 import { useEffect, useRef, useState } from "react";
 import { Panel, Chip, Empty } from "../../components/ui";
 import {
@@ -38,8 +31,7 @@ export function AssistantPage() {
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
-  // Set while a stream is in flight: `detach` releases the native listener and
-  // `stop` is what the Stop button calls.
+
   const stopRef = useRef<(() => void) | null>(null);
   const detachRef = useRef<(() => void) | null>(null);
 
@@ -54,17 +46,8 @@ export function AssistantPage() {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
   }, [messages, streaming]);
 
-  // Leaving the screen mid-stream must not leave a listener updating an
-  // unmounted tree.
   useEffect(() => () => detachRef.current?.(), []);
 
-  /**
-   * Sends `prompt`, defaulting to whatever is in the input box.
-   *
-   * The native side acknowledges a stream immediately and delivers tokens
-   * afterwards, so the busy state is owned by the stream itself: it ends on
-   * `done`/`failed`, or when the user stops it, not when the ack arrives.
-   */
   const send = async (override?: string) => {
     const prompt = (override ?? input).trim();
     if (prompt === "" || streaming) return;
@@ -78,8 +61,6 @@ export function AssistantPage() {
     const reply: ChatMessage = { role: "assistant", content: "" };
     setMessages((prev) => [...prev, reply]);
 
-    // `stopped` lets the Stop button detach without needing to cancel the
-    // native stream, which has no cancellation channel.
     let stopped = false;
     stopRef.current = () => {
       stopped = true;
@@ -91,8 +72,7 @@ export function AssistantPage() {
       detachRef.current = null;
       setStreaming(false);
       stopRef.current = null;
-      // `final` lets a clean finish linger on `happy` instead of being
-      // immediately overwritten by the neutral pose.
+
       useWolfStore.getState().pushShared(final);
     };
 
@@ -100,8 +80,6 @@ export function AssistantPage() {
     const onEvent = (event: StreamEvent) => {
       if (stopped) return;
       if (event.type === "token") {
-        // The wolf thinks while it waits, then starts speaking with the first
-        // real token instead of the acknowledgement.
         if (!saidAnything) {
           saidAnything = true;
           useWolfStore.getState().pushShared("speaking");
@@ -122,8 +100,6 @@ export function AssistantPage() {
         );
         finish();
       } else {
-        // `done`: the model finished cleanly, so acknowledge it before the
-        // store drops back to the neutral pose.
         finish("all-clear");
       }
     };
@@ -132,11 +108,6 @@ export function AssistantPage() {
       const client = getOllamaClient();
       client.update({ url: settings.ollamaUrl, model: settings.ollamaModel });
 
-      // Resolve the context for this exact question first, so it is classified
-      // against what the user just asked rather than a prompt built from a
-      // different wording. Sending the block resolved here also keeps the model
-      // and the screen on one context, instead of the native side rebuilding it
-      // from the message text.
       const resolved = await client.assistantContext(prompt);
       if (stopped) return;
 
@@ -347,7 +318,6 @@ export function AssistantPage() {
             placeholder="Ask Wolf…"
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => {
-              // Enter sends; Shift+Enter adds a newline.
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
                 void send();

@@ -1,4 +1,3 @@
-/** Calendar screen: month grid, day detail, and event management. */
 import { useEffect, useMemo, useState } from "react";
 import { Panel, ErrorNote, Empty, Chip } from "../../components/ui";
 import { EventFormDialog } from "./EventFormDialog";

@@ -1,4 +1,3 @@
-/** Dashboard: today's numbers, quick add, focus, next events, habit streak. */
 import { useEffect, useMemo, useState } from "react";
 import { Panel, Stat, Empty, Chip } from "../../components/ui";
 import { PixelProgress } from "./PixelProgress";
@@ -62,7 +61,6 @@ export function HomePage() {
     overdue: counts.overdue,
   });
 
-  // The resting pose tracks the real day, but never overrides a running timer.
   useEffect(() => {
     if (focusView.running) return;
     useWolfStore

@@ -33,7 +33,6 @@ export default tseslint.config(
     },
   },
   {
-    // Tests assert on loosely-typed fakes and sometimes shadow names.
     files: ["**/*.test.ts", "**/*.test.tsx"],
     rules: {
       "@typescript-eslint/no-unused-vars": "off",

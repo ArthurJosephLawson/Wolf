@@ -1,11 +1,3 @@
-/**
- * Typed error handling for the Tauri bridge.
- *
- * Rust serialises every failure as `{ kind, message }` with a message written
- * for humans. The UI never shows a stack trace or a raw HTTP error; if a
- * rejection is not a `WolfError`, we map it to a generic message here rather
- * than leaking it.
- */
 import type { WolfErrorShape } from "../types";
 
 export class WolfAppError extends Error {
@@ -17,7 +9,6 @@ export class WolfAppError extends Error {
     this.kind = kind;
   }
 
-  /** True when the local AI daemon is the problem. */
   get isOllamaIssue(): boolean {
     return [
       "unavailable",

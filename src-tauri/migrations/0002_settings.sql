@@ -1,5 +1,3 @@
--- Wolf :: migration 0002 :: key/value settings store
-
 CREATE TABLE IF NOT EXISTS settings (
     key        TEXT PRIMARY KEY NOT NULL,
     value      TEXT NOT NULL,

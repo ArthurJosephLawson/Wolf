@@ -1,4 +1,3 @@
-/** Habits screen: create, toggle today, archive, and a 28-day pixel grid. */
 import { useEffect, useMemo, useState } from "react";
 import { Panel, ErrorNote, Empty, Field, Modal } from "../../components/ui";
 import { useHabitStore } from "./habitStore";

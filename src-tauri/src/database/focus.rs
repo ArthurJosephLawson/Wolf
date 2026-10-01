@@ -86,13 +86,6 @@ impl Database {
         Ok(())
     }
 
-    /// Aggregate counters used by the dashboard, the focus screen and the AI.
-    ///
-    /// `today_local` and `week_start_local` are local calendar days. Sessions
-    /// are stored as UTC instants, so each local day is converted to its own
-    /// half-open UTC range and compared as a range. Slicing the stored string to
-    /// get a "day" would bucket a session by its UTC date instead, which puts
-    /// every late-evening session on the wrong day for most of the world.
     pub fn focus_stats(&self, today_local: &str, week_start_local: &str) -> WolfResult<FocusStats> {
         let first = parse_local_day(week_start_local)?;
         let days: Vec<DayWindow> = (0..7)
@@ -107,9 +100,6 @@ impl Database {
             .collect::<WolfResult<Vec<_>>>()?;
 
         self.with_conn(|conn| {
-            // One row per local day, joined on that day's UTC range. The extra
-            // filters sit in the ON clause so a day with no sessions still
-            // produces a row instead of dropping out of the sparkline.
             let mut sql = String::from("WITH days(day, from_utc, until_utc) AS (VALUES ");
             let mut values: Vec<rusqlite::types::Value> = Vec::with_capacity(days.len() * 3);
             for (index, window) in days.iter().enumerate() {
@@ -169,8 +159,6 @@ impl Database {
                 |r| r.get(0),
             )?;
 
-            // The LEFT JOIN emits exactly one row per day, so summing `counted`
-            // is the same as summing the seven windows and cannot drift.
             let week_counts: i64 = counted.values().map(|(count, _)| *count).sum();
             let week_minutes: i64 = counted.values().map(|(_, minutes)| *minutes).sum();
 
@@ -186,7 +174,6 @@ impl Database {
     }
 }
 
-/// One local day and the half-open UTC instant range that contains it.
 struct DayWindow {
     day: String,
     from: String,
@@ -201,12 +188,6 @@ fn parse_local_day(value: &str) -> WolfResult<chrono::NaiveDate> {
     })
 }
 
-/// The first instant of a local day, as the fixed-width UTC string SQLite
-/// compares against.
-///
-/// Local midnight does not always exist: some zones move the clock forward at
-/// 00:00, so the first few hours are probed to keep stats working on those days
-/// instead of failing the whole screen.
 fn local_day_start(date: chrono::NaiveDate) -> WolfResult<String> {
     for hour in 0..4 {
         let Some(naive) = date.and_hms_opt(hour, 0, 0) else {
@@ -238,12 +219,6 @@ mod tests {
     use super::*;
     use crate::database::test_support::test_db;
 
-    /// A completed session starting at a given **local** wall-clock time.
-    ///
-    /// Sessions are stored as UTC instants but bucketed by local day, so the
-    /// tests have to describe a local time and let the helper do the
-    /// conversion. Writing `T09:00:00.000Z` directly would only agree with the
-    /// local day when the test machine happens to run in UTC.
     fn local_session(date: &str, hour: u32, minute: u32, minutes: u32) -> NewFocusSession {
         let day = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").expect("valid date");
         let started = day
@@ -268,7 +243,6 @@ mod tests {
         }
     }
 
-    /// Mid-morning on the given local day.
     fn session(start: &str, minutes: u32) -> NewFocusSession {
         local_session(start, 9, 0, minutes)
     }
@@ -380,9 +354,6 @@ mod tests {
 
     #[test]
     fn sessions_straddling_local_midnight_stay_in_their_own_day() {
-        // The regression this guards: a session at 23:30 on one local day and
-        // one at 00:30 on the next both land on the *UTC* day before or after
-        // for most timezones, which is what the old substr comparison used.
         let db = test_db();
         db.create_focus_session(&local_session("2026-09-27", 23, 30, 25))
             .unwrap();
@@ -438,8 +409,6 @@ mod tests {
 
     #[test]
     fn day_bounds_are_ordered_and_contiguous() {
-        // A day window must start exactly where the previous one ended, or
-        // sessions are double counted or dropped.
         let first = parse_local_day("2026-09-22").unwrap();
         let mut previous = local_day_start(first).unwrap();
         for offset in 0..7 {

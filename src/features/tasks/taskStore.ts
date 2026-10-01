@@ -1,10 +1,3 @@
-/**
- * Task store.
- *
- * Owns the task list, its filter/sort/search UI state, and the mutations. All
- * writes go through the Rust repository and are re-read on success, so the
- * database stays authoritative (completed_at, updated_at, …).
- */
 import { create } from "zustand";
 import { taskService } from "../../services/tasks";
 import { toAppError } from "../../lib/errors";
@@ -108,7 +101,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       set((state) => ({
         tasks: state.tasks.map((t) => (t.id === saved.id ? saved : t)),
         error: null,
-        // Remember the completion so the wolf can celebrate exactly once.
+
         lastCompletedId: completed ? saved.id : state.lastCompletedId,
       }));
       return true;
@@ -147,7 +140,6 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 }));
 
-/** The visible list, derived from the store. */
 export function selectVisibleTasks(state: TaskStore): Task[] {
   const base = state.search.trim()
     ? state.tasks.filter((t) => {

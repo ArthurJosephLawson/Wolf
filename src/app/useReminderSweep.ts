@@ -5,20 +5,16 @@ import { isDesktop } from "../services/ipc";
 import { MESSAGES, notify } from "../services/notify";
 import type { Settings } from "../types";
 
-/** How often the reminder sweep runs. */
 const REMINDER_INTERVAL_MS = 30_000;
 
 export function useReminderSweep(settings: Settings): void {
-  // Event reminders. The backend already filters on its own setting; the sweep
-  // is gated here as well so a disabled toggle costs no polling at all.
   useEffect(() => {
     if (!isDesktop) return;
     if (!settings.eventRemindersEnabled || !settings.notificationsEnabled)
       return;
 
     let cancelled = false;
-    // Delivery is awaited before the row is marked, so a slow notification
-    // service must not let the next tick start a second sweep on the same rows.
+
     let inFlight = false;
 
     const sweep = async () => {
@@ -34,8 +30,8 @@ export function useReminderSweep(settings: Settings): void {
           await calendarService.markNotified(event.id);
         }
       } catch {
-        // Reminders are best-effort: a refused notification must not stop the
-        // app or stop the next sweep.
+        // A refused notification must not stop the app or the next sweep.
+        return;
       } finally {
         inFlight = false;
       }

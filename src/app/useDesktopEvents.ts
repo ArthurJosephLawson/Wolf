@@ -8,9 +8,6 @@ export function useDesktopEvents(): void {
   const setRoute = useUiStore((s) => s.setRoute);
   const pushToast = useUiStore((s) => s.pushToast);
 
-  // Tray menu and companion errors arrive as Tauri events. `listen` resolves
-  // asynchronously, so the disposers are collected into a mutable holder and
-  // drained on cleanup — including any that land after unmount.
   useEffect(() => {
     if (!isDesktop) return;
     const disposers: (() => void)[] = [];

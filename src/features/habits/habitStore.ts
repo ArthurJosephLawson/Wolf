@@ -1,4 +1,3 @@
-/** Habit store: list with derived streaks, plus mutations. */
 import { create } from "zustand";
 import { habitService } from "../../services/habits";
 import { toAppError } from "../../lib/errors";
@@ -17,7 +16,7 @@ interface HabitStore {
   update: (id: string, update: HabitUpdate) => Promise<boolean>;
   setArchived: (id: string, archived: boolean) => Promise<boolean>;
   remove: (id: string) => Promise<boolean>;
-  /** Flip today's completion. Optimistic, then reloaded for accurate streaks. */
+
   toggleToday: (id: string) => Promise<boolean>;
   clearError: () => void;
 }
@@ -46,7 +45,8 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
       const habits = await habitService.list(false);
       set({ habits, error: null });
     } catch {
-      // A background refresh failing is not worth interrupting the user for.
+      // A failed refresh leaves the habits already on screen.
+      return;
     }
   },
 
@@ -142,7 +142,6 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
       return false;
     }
 
-    // Streaks and the 28-day grid come from Rust, so re-read rather than guess.
     await get().refresh();
     return true;
   },

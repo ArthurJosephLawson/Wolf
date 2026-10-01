@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-/// One entry of `GET /api/tags`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct OllamaModel {
@@ -20,13 +19,12 @@ pub struct OllamaModel {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum OllamaState {
-    /// Reachable and the configured model is present.
     Ready,
-    /// Reachable, but no models are installed at all.
+
     NoModels,
-    /// Reachable, but the configured model is missing.
+
     ModelMissing,
-    /// Not reachable / not running.
+
     Offline,
 }
 
@@ -50,10 +48,10 @@ pub struct OllamaStatus {
     pub model: Option<String>,
     #[serde(default)]
     pub models: Vec<OllamaModel>,
-    /// Server-reported version, when the daemon exposes `/api/version`.
+
     #[serde(default)]
     pub version: Option<String>,
-    /// Short, human readable explanation of the current state.
+
     #[serde(default)]
     pub detail: String,
     pub checked_at: String,
@@ -79,14 +77,14 @@ pub enum ChatRole {
 pub struct ChatRequest {
     pub model: String,
     pub messages: Vec<ChatMessage>,
-    /// Local context block (tasks/events/habits) injected by Wolf.
+
     #[serde(default)]
     pub context: String,
     #[serde(default)]
     pub system_prompt: Option<String>,
     #[serde(default)]
     pub temperature: Option<f64>,
-    /// Keeps small local models from rambling; `None` lets the model decide.
+
     #[serde(default)]
     pub num_predict: Option<u32>,
     #[serde(default)]
@@ -94,7 +92,6 @@ pub struct ChatRequest {
 }
 
 impl ChatRequest {
-    /// Build the final message list sent to `/api/chat`.
     pub fn to_api_messages(&self) -> Vec<ChatMessage> {
         let mut messages: Vec<ChatMessage> = Vec::with_capacity(self.messages.len() + 2);
 

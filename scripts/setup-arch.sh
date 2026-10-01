@@ -1,24 +1,21 @@
 #!/usr/bin/env bash
-# Install the system packages Wolf needs on Arch Linux (and derivatives).
-#
-# Safe to re-run: pacman is a no-op for anything already installed.
-# Run as your normal user; it will ask for sudo only when it needs to.
+
 set -euo pipefail
 
 PACKAGES=(
-  # Toolchain
+
   nodejs npm
   rustup
-  # Tauri v2 system dependencies (WebKitGTK 4.1, not 4.0)
+
   webkit2gtk-4.1
   gtk3
   openssl
   sqlite
   pkgconf
-  # Desktop integration: tray icon, notifications, autostart, file dialogs
+
   libayatana-appindicator
   libappindicator-gtk3
-  # Bundling .deb / AppImage output
+
   linux-headers
   base-devel
   curl

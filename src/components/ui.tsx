@@ -1,4 +1,3 @@
-/** Small, dependency-free UI primitives shared across screens. */
 import { useEffect, useRef, type ReactNode } from "react";
 
 interface PanelProps {
@@ -77,7 +76,6 @@ export function Field({
   );
 }
 
-/** Inline error, used instead of a toast when the failure is tied to a form. */
 export function ErrorNote({
   message,
   onDismiss,
@@ -114,10 +112,6 @@ interface ModalProps {
   footer?: ReactNode;
 }
 
-/**
- * A keyboard-friendly dialog: focus moves in on open, Escape closes, and Tab is
- * trapped inside while it is open.
- */
 export function Modal({ open, title, onClose, children, footer }: ModalProps) {
   const panel = useRef<HTMLDivElement>(null);
 
@@ -206,7 +200,6 @@ export function Modal({ open, title, onClose, children, footer }: ModalProps) {
   );
 }
 
-/** A labelled statistic, used all over the dashboard. */
 export function Stat({
   label,
   value,

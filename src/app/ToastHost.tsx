@@ -1,4 +1,3 @@
-/** Toast host: renders the store's queue and expires each toast. */
 import { useEffect } from "react";
 import { useUiStore, type Toast } from "./uiStore";
 

@@ -41,9 +41,6 @@ fn validate_name(raw: &str) -> WolfResult<String> {
     Ok(name.to_string())
 }
 
-/// The set of scheduled dates a habit should have been completed on, walking
-/// backwards from `today`. A day in the future is never scheduled, and the walk
-/// stops after `HORIZON_DAYS` to keep streaks bounded on brand-new habits.
 const HORIZON_DAYS: i64 = 400;
 
 fn scheduled_dates(habit: &Habit, today: NaiveDate) -> BTreeSet<NaiveDate> {
@@ -60,15 +57,11 @@ fn scheduled_dates(habit: &Habit, today: NaiveDate) -> BTreeSet<NaiveDate> {
     set
 }
 
-/// Consecutive scheduled days completed, counting backwards from `today`.
-/// The current day only breaks the streak once it is over, so an incomplete
-/// "today" does not reset a streak the user can still salvage.
 pub fn current_streak(completions: &BTreeSet<NaiveDate>, habit: &Habit, today: NaiveDate) -> u32 {
     let scheduled = scheduled_dates(habit, today);
     let mut streak = 0u32;
     let mut cursor = today;
 
-    // If today is scheduled but not done, start counting from the previous day.
     if scheduled.contains(&cursor) && !completions.contains(&cursor) {
         cursor -= Duration::days(1);
     }
@@ -86,12 +79,11 @@ pub fn current_streak(completions: &BTreeSet<NaiveDate>, habit: &Habit, today: N
     streak
 }
 
-/// Longest run of consecutive scheduled days ever completed.
 pub fn longest_streak(completions: &BTreeSet<NaiveDate>, habit: &Habit, today: NaiveDate) -> u32 {
     let scheduled = scheduled_dates(habit, today);
     let mut best = 0u32;
     let mut run = 0u32;
-    // `scheduled` is ascending, so a single pass finds the longest run.
+
     for date in scheduled.iter() {
         if completions.contains(date) {
             run += 1;
@@ -212,7 +204,6 @@ impl Database {
         self.get_habit(id)
     }
 
-    /// Habits are archived, never deleted, so history stays intact.
     pub fn archive_habit(&self, id: &str, archived: bool) -> WolfResult<Habit> {
         self.update_habit(
             id,
@@ -232,7 +223,6 @@ impl Database {
         Ok(())
     }
 
-    /// Record completion for a local calendar date. Idempotent.
     pub fn complete_habit(&self, habit_id: &str, date: &str) -> WolfResult<HabitCompletion> {
         let habit = self.get_habit(habit_id)?;
         let normalized = normalize_date(date)?;
@@ -277,7 +267,6 @@ impl Database {
         })
     }
 
-    /// Habits plus derived streak / progress data, ready for rendering.
     pub fn list_habits_with_progress(
         &self,
         include_archived: bool,
@@ -295,8 +284,6 @@ impl Database {
         Ok(build_progress(habit, today, &dates))
     }
 
-    /// Read-only variant used by the AI context builder, which already holds a
-    /// connection and only needs a consistent snapshot.
     pub fn habit_summaries(
         &self,
         today: NaiveDate,
@@ -346,7 +333,6 @@ pub fn build_progress(habit: &Habit, today: NaiveDate, dates: &[String]) -> Habi
     }
 }
 
-/// Aggregate used by the dashboard and the AI context builder.
 pub fn habit_summaries(
     conn: &Connection,
     today: NaiveDate,
@@ -414,7 +400,6 @@ mod tests {
 
     #[test]
     fn unfinished_today_does_not_break_the_streak() {
-        // Today not completed yet, but the three previous days are done.
         let completions = set(&["2026-09-27", "2026-09-26", "2026-09-25"]);
         let streak = current_streak(
             &completions,
@@ -437,7 +422,6 @@ mod tests {
 
     #[test]
     fn weekday_habit_skips_the_weekend() {
-        // 2026-09-25 is a Friday, 26/27 the weekend, 28 a Monday.
         let friday = habit(HabitFrequency::Weekdays);
         let completions = set(&["2026-09-25"]);
         let streak = current_streak(&completions, &friday, date("2026-09-28"));
@@ -450,7 +434,7 @@ mod tests {
     #[test]
     fn weekday_habit_breaks_when_a_weekday_is_missed() {
         let weekday_habit = habit(HabitFrequency::Weekdays);
-        // Thursday 24 done, Friday 25 missed, weekend skipped, Monday 28 done.
+
         let completions = set(&["2026-09-24", "2026-09-28"]);
         let streak = current_streak(&completions, &weekday_habit, date("2026-09-28"));
         assert_eq!(streak, 1);

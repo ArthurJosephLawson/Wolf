@@ -1,6 +1,3 @@
-//! Desktop integration commands: window control, tray bridge, notifications and
-//! environment reporting.
-
 use tauri::{AppHandle, Manager, Runtime, State};
 
 use crate::error::{WolfError, WolfResult};
@@ -53,8 +50,6 @@ pub fn quit_app(app: AppHandle) -> WolfResult<()> {
     Ok(())
 }
 
-/// Send a local desktop notification. Notifications are best-effort: the UI
-/// shows the readable reason when the desktop refuses.
 #[tauri::command]
 pub fn send_notification(
     app: AppHandle,
@@ -83,7 +78,6 @@ fn truncate(value: &str, max_chars: usize) -> String {
     format!("{cut}…")
 }
 
-/// Everything the UI needs to describe the platform it is running on.
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvironmentInfo {
@@ -110,9 +104,6 @@ pub fn environment(app: AppHandle) -> EnvironmentInfo {
     }
 }
 
-/// Apply settings that have immediate desktop consequences. Failures here are
-/// non-fatal: the setting is still saved and reported through the command's
-/// own return value.
 pub fn apply_settings<R: Runtime>(app: &AppHandle<R>, settings: &Settings) {
     if let Err(err) = windows::set_companion_always_on_top(app, settings.companion_always_on_top) {
         log::warn!("could not update companion always-on-top: {err}");
@@ -122,7 +113,6 @@ pub fn apply_settings<R: Runtime>(app: &AppHandle<R>, settings: &Settings) {
     }
 }
 
-/// Close-request policy: hide to tray instead of quitting when configured.
 pub fn handle_close_requested<R: Runtime>(app: &AppHandle<R>) -> bool {
     let close_to_tray = crate::state::state(app)
         .map(|s| s.settings().close_to_tray)
@@ -135,7 +125,6 @@ pub fn handle_close_requested<R: Runtime>(app: &AppHandle<R>) -> bool {
     false
 }
 
-/// Convenience used by tests and the reminder scheduler.
 pub fn state_ref<R: Runtime>(app: &AppHandle<R>) -> WolfResult<State<'_, AppState>> {
     app.try_state::<AppState>()
         .ok_or_else(|| WolfError::internal("Wolf is still starting up."))

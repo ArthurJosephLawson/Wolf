@@ -1,9 +1,3 @@
-//! Wolf — a local-first pixel-art productivity companion for Linux desktops.
-//!
-//! Everything lives on this machine: data in SQLite under the user's config
-//! directory, AI through a locally running Ollama, notifications through the
-//! freedesktop D-Bus service. There is no telemetry and no cloud dependency.
-
 pub mod assistant;
 pub mod commands;
 pub mod database;
@@ -20,10 +14,8 @@ use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 use crate::database::Database;
 use crate::state::AppState;
 
-/// Emitted when the tray menu is used.
-/// Payload: `{ route?: "tasks" | "settings", focus?: "start" | "pause" }`.
 pub const TRAY_EVENT: &str = tray::TRAY_EVENT;
-/// Emitted when the companion window could not be created.
+
 pub const COMPANION_ERROR_EVENT: &str = "wolf://companion-error";
 
 fn bootstrap_database() -> Result<Database, String> {
@@ -36,8 +28,6 @@ pub fn run() {
     let database = match bootstrap_database() {
         Ok(db) => db,
         Err(reason) => {
-            // Without a database Wolf cannot do anything useful, and an empty
-            // window would hide the reason. Say so and stop.
             eprintln!("wolf: could not open the local database: {reason}");
             eprintln!(
                 "wolf: expected it under $XDG_CONFIG_HOME/wolf/wolf.db (usually ~/.config/wolf/wolf.db)"
@@ -70,7 +60,6 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::new(database, settings))
         .invoke_handler(tauri::generate_handler![
-            // Tasks
             commands::tasks::list_tasks,
             commands::tasks::create_task,
             commands::tasks::update_task,
@@ -78,7 +67,6 @@ pub fn run() {
             commands::tasks::delete_task,
             commands::tasks::task_stats,
             commands::tasks::task_overview,
-            // Habits
             commands::habits::list_habits,
             commands::habits::create_habit,
             commands::habits::update_habit,
@@ -87,7 +75,6 @@ pub fn run() {
             commands::habits::complete_habit,
             commands::habits::uncomplete_habit,
             commands::habits::list_habit_completions,
-            // Calendar
             commands::calendar::list_events,
             commands::calendar::upcoming_events,
             commands::calendar::create_event,
@@ -98,23 +85,19 @@ pub fn run() {
             commands::calendar::due_event_reminders,
             commands::calendar::mark_event_notified,
             commands::calendar::calendar_overview,
-            // Focus
             commands::focus::list_focus_sessions,
             commands::focus::create_focus_session,
             commands::focus::delete_focus_session,
             commands::focus::focus_stats,
-            // Settings
             commands::settings::get_settings,
             commands::settings::save_settings,
             commands::settings::select_model,
-            // Local AI
             commands::ollama::ollama_status,
             commands::ollama::list_ollama_models,
             commands::ollama::suggested_model,
             commands::ollama::ask_ollama,
             commands::ollama::ask_ollama_stream,
             commands::assistant::assistant_context,
-            // Desktop integration
             commands::desktop::show_main_window,
             commands::desktop::hide_main_window,
             commands::desktop::set_companion_visible,

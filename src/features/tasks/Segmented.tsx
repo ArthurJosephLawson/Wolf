@@ -1,9 +1,3 @@
-/**
- * Horizontal segmented control.
- *
- * A radio group rather than a set of buttons so arrow keys work and screen
- * readers announce the selected option.
- */
 import type { ReactNode } from "react";
 
 interface SegmentOption<T extends string> {

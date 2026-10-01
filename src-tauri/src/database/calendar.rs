@@ -11,7 +11,6 @@ use crate::models::new_id;
 const SELECT_COLUMNS: &str = "id, title, description, start_time, end_time, all_day, \
                               reminder_minutes, notified_at, created_at, updated_at";
 
-/// Local naive datetime format used for all event boundaries.
 pub const EVENT_DATETIME_FORMAT: &str = "%Y-%m-%dT%H:%M";
 
 fn map_event(row: &Row<'_>) -> rusqlite::Result<CalendarEvent> {
@@ -113,7 +112,6 @@ impl Database {
         })
     }
 
-    /// Events whose window intersects `from` (inclusive date) ..= `to` (inclusive date).
     pub fn list_events(&self, query: &EventListQuery) -> WolfResult<Vec<CalendarEvent>> {
         let from = query
             .from
@@ -147,7 +145,6 @@ impl Database {
         })
     }
 
-    /// Events from `now` onwards, used for the "upcoming" panel and reminders.
     pub fn upcoming_events(&self, from_local: &str, limit: u32) -> WolfResult<Vec<CalendarEvent>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(&format!(
@@ -221,7 +218,7 @@ impl Database {
             }
             if let Some(r) = reminder {
                 existing.reminder_minutes = r;
-                // Moving an event re-arms its reminder.
+
                 existing.notified_at = None;
             }
             existing.updated_at = now.clone();
@@ -268,7 +265,6 @@ impl Database {
         Ok(())
     }
 
-    /// Mark an event's reminder as delivered so it never fires twice.
     pub fn mark_event_notified(&self, id: &str) -> WolfResult<()> {
         self.with_conn(|conn| {
             conn.execute(
@@ -279,7 +275,6 @@ impl Database {
         })
     }
 
-    /// Per-day rollup for the calendar grid.
     pub fn day_summaries(&self, from: NaiveDate, to: NaiveDate) -> WolfResult<Vec<DaySummary>> {
         let events = self.list_events(&EventListQuery {
             from: Some(from.format("%Y-%m-%d").to_string()),

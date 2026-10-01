@@ -1,10 +1,3 @@
-/*
- * Pixel-art primitives.
- *
- * Everything hard-edged: square corners, 2px "bevelled" borders drawn with
- * box-shadows, no anti-aliased curves, no blur.
- */
-
 .pixel-border {
   border: var(--pixel) solid var(--border);
   box-shadow:
@@ -29,7 +22,6 @@
   box-shadow: var(--pixel) var(--pixel) 0 0 var(--border-strong);
 }
 
-/* Corner notches, the classic 8-bit panel shape. */
 .pixel-corners {
   position: relative;
 }
@@ -67,7 +59,6 @@
   display: inline-block;
 }
 
-/* Crisp, unsmoothed scaling for any rasterised art in the app. */
 .pixelated {
   image-rendering: pixelated;
   image-rendering: crisp-edges;

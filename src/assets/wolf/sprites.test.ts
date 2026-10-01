@@ -68,7 +68,6 @@ describe("artwork", () => {
   });
 
   it("only needs two clear rows above the eyes, so ears can lift into them", () => {
-    // The happy pose lifts the ears to row 0; it must not clip.
     for (const frame of framesFor("happy")) {
       expect(frame).toHaveLength(SPRITE_HEIGHT);
     }
@@ -141,7 +140,7 @@ describe("frames", () => {
 
   it("closes then reopens the eyes while blinking", () => {
     const [line = "", arc, open] = framesFor("blink");
-    // The eye band collapses to a flat line, but the head outline must survive.
+
     expect(line[11]!.slice(9, 13)).toBe("KKKK");
     expect(line[11]!.slice(15, 19)).toBe("KKKK");
     expect(line[10]!.slice(9, 13)).toBe("BBBB");
@@ -188,7 +187,6 @@ describe("frames", () => {
   });
 
   it("shows a heart for the winking pose only", () => {
-    // `P` is also the tongue and the blush, so match the heart's own top row.
     for (const state of WOLF_STATES) {
       const hearts = framesFor(state).some((f) =>
         f.some((r) => r.includes("P.P")),
@@ -295,8 +293,6 @@ describe("signal validation", () => {
   });
 
   it("rejects anything that is not a signal", () => {
-    // Signals cross the window boundary as untyped JSON, so these must not be
-    // able to reach resolveState.
     expect(isWolfSignal("happy")).toBe(false);
     expect(isWolfSignal("")).toBe(false);
     expect(isWolfSignal(null)).toBe(false);
@@ -306,8 +302,6 @@ describe("signal validation", () => {
   });
 
   it("keeps the list and the type in step", () => {
-    // Every state a signal can resolve to must be reachable from the list, and
-    // the list must not contain anything resolveState cannot place.
     const resolved = new Set(WOLF_SIGNALS.map(resolveState));
     for (const state of WOLF_STATES) {
       if (state === "idle" || state === "listening" || state === "sad") {
@@ -319,8 +313,6 @@ describe("signal validation", () => {
 
 describe("time to live", () => {
   it("expires every transient pose so the wolf settles on its own", () => {
-    // Regression: `listening` was missing from a duplicated TTL table, which
-    // left it stuck until the companion window was closed.
     for (const state of [
       "speaking",
       "happy",

@@ -1,4 +1,3 @@
-/** Horizontal progress meter drawn with hard-edged segments. */
 export function PixelProgress({
   value,
   max,

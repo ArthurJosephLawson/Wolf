@@ -7,9 +7,6 @@ use crate::models::Settings;
 const SETTINGS_KEY: &str = "app";
 
 impl Database {
-    /// Load the persisted settings, falling back to defaults when absent or
-    /// unreadable. A corrupt settings blob must never stop the app from
-    /// starting, so the raw JSON is only trusted after it deserialises.
     pub fn load_settings(&self) -> WolfResult<Settings> {
         let raw: Option<String> = self.with_conn(|conn| {
             Ok(conn
@@ -34,7 +31,6 @@ impl Database {
         })
     }
 
-    /// Persist settings, always writing a sanitised copy.
     pub fn save_settings(&self, settings: &Settings) -> WolfResult<Settings> {
         let clean = settings.clone().sanitized();
         let encoded = serde_json::to_string(&clean).map_err(|e| {
@@ -109,9 +105,6 @@ mod tests {
 
     #[test]
     fn a_row_written_before_the_theme_field_was_removed_still_loads() {
-        // Settings are one JSON blob, so databases written by an older build
-        // still carry `theme`. Serde ignores unknown fields, so those users keep
-        // their preferences instead of silently falling back to defaults.
         let db = test_db();
         let mut row = serde_json::to_value(Settings::default()).expect("encode");
         row["theme"] = serde_json::json!("dusk");

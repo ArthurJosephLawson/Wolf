@@ -10,8 +10,6 @@ use crate::models::ollama::{
 use crate::ollama::client::StreamEvent;
 use crate::state::AppState;
 
-/// Health + model probe. Never fails hard: an offline daemon is a state the UI
-/// must render, not an error.
 #[tauri::command]
 pub async fn ollama_status(
     state: State<'_, AppState>,
@@ -33,13 +31,11 @@ pub async fn list_ollama_models(
     state.ollama.list_models(&base).await
 }
 
-/// Model suggested to the user when the daemon has none installed.
 #[tauri::command]
 pub fn suggested_model() -> &'static str {
     crate::ollama::SUGGESTED_MODEL
 }
 
-/// One-shot, non-streaming answer. Used for short contextual lookups.
 #[tauri::command]
 pub async fn ask_ollama(
     state: State<'_, AppState>,
@@ -56,7 +52,7 @@ pub async fn ask_ollama(
         messages: history.unwrap_or_default(),
         context,
         system_prompt: Some(assistant::system_prompt()),
-        // Local models are literal; a touch of determinism keeps answers stable.
+
         temperature: Some(0.2),
         num_predict: Some(512),
         keep_alive: None,
@@ -64,8 +60,6 @@ pub async fn ask_ollama(
     state.ollama.chat(&settings.ollama_url, &request).await
 }
 
-/// Streaming answer. The command returns as soon as the stream is armed so the
-/// UI can render instantly; tokens are delivered over `channel`.
 #[tauri::command]
 pub async fn ask_ollama_stream(
     app: AppHandle,
@@ -93,8 +87,6 @@ pub async fn ask_ollama_stream(
         .clone()
         .unwrap_or_else(|| settings.ollama_model.clone());
 
-    // Pre-flight the daemon so the user gets an instant, clear error instead of
-    // a stream that silently never starts.
     let status = state
         .ollama
         .status(&settings.ollama_url, &requested_model)
@@ -126,10 +118,6 @@ pub async fn ask_ollama_stream(
         return Err(WolfError::Ollama(err));
     }
 
-    // A context supplied by the caller wins, so the assistant screen can show
-    // the user exactly which block was resolved before it is sent. Anything
-    // blank falls back to being rebuilt here, which keeps this command usable on
-    // its own.
     let context = match request.context {
         Some(c) if !c.trim().is_empty() => c,
         _ => assistant::build_context(&state.db, &last_prompt, today())?,
@@ -170,7 +158,7 @@ pub struct AskRequest {
     #[serde(default)]
     pub model: Option<String>,
     pub messages: Vec<ChatMessage>,
-    /// Pre-resolved `<local_context>` block. Rebuilt server-side when absent.
+
     #[serde(default)]
     pub context: Option<String>,
     #[serde(default)]

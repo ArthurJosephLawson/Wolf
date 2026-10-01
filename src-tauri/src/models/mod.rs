@@ -1,10 +1,3 @@
-//! Domain models shared between the persistence layer and the UI.
-//!
-//! Every type here is `serde`-round-trippable so the exact same struct crosses
-//! the Tauri IPC boundary. Timestamps travel as RFC 3339 strings and calendar
-//! dates as `YYYY-MM-DD` strings, which keeps SQLite comparisons textual and
-//! debuggable.
-
 use serde::{Deserialize, Serialize};
 
 pub mod calendar;
@@ -14,7 +7,6 @@ pub mod ollama;
 pub mod settings;
 pub mod task;
 
-/// Zero-based priority, lower is more urgent. Mirrored in `src/types/index.ts`.
 pub const PRIORITY_NORMAL: i64 = 1;
 
 pub fn now_iso() -> String {
@@ -25,11 +17,9 @@ pub fn new_id() -> String {
     uuid::Uuid::new_v4().to_string()
 }
 
-/// Shared shape for every "sortable, filterable list" screen.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskSort {
-    /// Manual/creation order: incomplete first, then by due date.
     #[default]
     Default,
     DueDate,
@@ -49,8 +39,6 @@ pub enum TaskFilter {
     Overdue,
 }
 
-// Re-export the domain types so the rest of the crate can `use crate::models::X`
-// without knowing which file a type lives in.
 pub use calendar::{
     CalendarEvent, CalendarEventUpdate, DaySummary, EventListQuery, NewCalendarEvent,
 };

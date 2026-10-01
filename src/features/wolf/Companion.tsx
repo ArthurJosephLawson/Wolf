@@ -1,13 +1,3 @@
-/**
- * The floating companion window.
- *
- * A compact, always-on-top wolf that can be dragged around the desktop, shows
- * a one-line status bubble, and opens the main app on interaction.
- *
- * Dragging uses Tauri's start-dragging, which keeps the movement native (so the
- * window is dragged by the compositor, not emulated in JS) and works on both
- * Wayland and X11.
- */
 import { useEffect, useMemo } from "react";
 import { useWolfFrame } from "./useWolfFrames";
 import { useWolfStore } from "./wolfStore";
@@ -17,7 +7,6 @@ import { desktopService } from "../../services/desktop";
 import { WolfSprite } from "./WolfSprite";
 import { greeting } from "../../app/uiStore";
 
-/** Keep the transcript short — the bubble is a status line, not a chat view. */
 const MAX_BUBBLE = 46;
 
 export function Companion() {
@@ -28,8 +17,6 @@ export function Companion() {
   const alwaysOnTop = useSettingsStore((s) => s.settings.companionAlwaysOnTop);
   const ollama = useOllamaSummary();
 
-  // The companion is its own window, so it needs its own periodic re-evaluation
-  // for transient state expiry and quiet-hours changes.
   useEffect(() => {
     const id = window.setInterval(
       () => useWolfStore.getState().reevaluate(),
@@ -38,8 +25,6 @@ export function Companion() {
     return () => window.clearInterval(id);
   }, []);
 
-  // Its store is a separate copy from the main window's, so the main window's
-  // signals have to arrive over the event channel to reach this window.
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
@@ -48,7 +33,6 @@ export function Companion() {
         useWolfStore.getState().push(signal);
       })
       .then((fn) => {
-        // The effect may have been cleaned up while the listen was in flight.
         if (disposed) fn();
         else unlisten = fn;
       });
@@ -58,7 +42,6 @@ export function Companion() {
     };
   }, []);
 
-  // Derived, not stored: the bubble is whichever of these two strings applies.
   const bubble = useMemo(() => {
     const text = ollama.checking ? label : ollama.label;
     return text.length <= MAX_BUBBLE
@@ -70,10 +53,7 @@ export function Companion() {
     void desktopService.showMain();
   };
 
-  /** Petting the wolf is a real interaction, not decoration. */
   const poke = () => {
-    // Broadcast too, so the wolf reacts in the main window as well. Receiving
-    // uses `push` rather than `pushShared`, so this cannot echo.
     useWolfStore.getState().pushShared("poked");
   };
 

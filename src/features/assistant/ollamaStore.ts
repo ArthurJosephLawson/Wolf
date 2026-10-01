@@ -1,10 +1,3 @@
-/**
- * Ollama status store.
- *
- * Holds the daemon's health, the installed model list and the short status
- * copy the header renders. A stopped daemon is a *state*, not an error, so the
- * probe never rejects out of this store.
- */
 import { create } from "zustand";
 import { OllamaClient, describeStatus } from "./OllamaClient";
 import { ollamaTransport } from "../../services/ollama";
@@ -22,7 +15,6 @@ function ensureClient(): OllamaClient {
   return client;
 }
 
-/** Point the shared client at the user's configuration. */
 export function configureOllama(url: string, model: string): void {
   ensureClient().update({ url, model });
 }
@@ -53,8 +45,6 @@ export const useOllamaStore = create<OllamaStore>((set, get) => ({
       set({ status, checking: false, error: null });
       return status;
     } catch (error) {
-      // `OllamaClient.status` already converts failures into an offline status;
-      // reaching here means something unexpected happened.
       const message =
         error instanceof Error ? error.message : "Wolf could not check Ollama.";
       set({ checking: false, error: message });

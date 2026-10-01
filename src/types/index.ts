@@ -1,8 +1,3 @@
-/**
- * Domain types shared by the UI. These mirror the Rust models in
- * `src-tauri/src/models/` — keep the two in sync.
- */
-
 export type TaskPriority = 0 | 1 | 2 | 3;
 
 export const PRIORITY_LABELS: Record<TaskPriority, string> = {
@@ -62,8 +57,6 @@ export interface TaskOverview {
   today: Task[];
   overdue: Task[];
 }
-
-/* ------------------------------------------------------------------ habits -- */
 
 export type HabitFrequency = "daily" | "weekdays" | "weekly";
 
@@ -130,13 +123,11 @@ export interface HabitWithProgress {
   completions30d: number;
 }
 
-/* ---------------------------------------------------------------- calendar -- */
-
 export interface CalendarEvent {
   id: string;
   title: string;
   description: string;
-  /** Naive local datetime, `YYYY-MM-DDTHH:MM`. */
+
   startTime: string;
   endTime: string;
   allDay: boolean;
@@ -176,8 +167,6 @@ export interface CalendarOverview {
   upcoming: CalendarEvent[];
 }
 
-/* ------------------------------------------------------------------- focus -- */
-
 export type FocusSessionKind = "focus" | "short_break" | "long_break";
 
 export interface FocusSession {
@@ -211,13 +200,10 @@ export interface FocusStats {
   dailyMinutes: DailyFocus[];
 }
 
-/** Timer phases, mirroring the Rust session kinds plus the transient states. */
 export type FocusPhase = "idle" | "focus" | "short_break" | "long_break";
 
 export type TimerStatus =
   "IDLE" | "FOCUSING" | "BREAK" | "PAUSED" | "COMPLETED";
-
-/* ---------------------------------------------------------------- settings -- */
 
 export interface Settings {
   ollamaUrl: string;
@@ -240,8 +226,6 @@ export interface Settings {
   autoCheckOllama: boolean;
   userName: string;
 }
-
-/* ------------------------------------------------------------------- ai ---- */
 
 export type OllamaState = "ready" | "no_models" | "model_missing" | "offline";
 
@@ -295,7 +279,7 @@ export type StreamEvent =
 export interface AskRequest {
   model?: string | null;
   messages: ChatMessage[];
-  /** Pre-resolved `<local_context>` block; rebuilt natively when absent. */
+
   context?: string | null;
   systemPrompt?: string | null;
   temperature?: number | null;
@@ -313,8 +297,6 @@ export interface AssistantContext {
   systemPrompt: string;
 }
 
-/* --------------------------------------------------------------- desktop --- */
-
 export interface EnvironmentInfo {
   sessionType: string;
   desktop: string;
@@ -331,7 +313,6 @@ export interface TrayPayload {
 export type Route =
   "home" | "tasks" | "calendar" | "habits" | "focus" | "assistant" | "settings";
 
-/** Error shape produced by the Rust `WolfError` serialiser. */
 export interface WolfErrorShape {
   kind: string;
   message: string;

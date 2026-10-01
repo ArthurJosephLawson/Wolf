@@ -23,7 +23,6 @@ describe("minutesUntil", () => {
   });
 
   it("rounds a partial minute up rather than to zero", () => {
-    // 30 seconds out would otherwise render as "Starting now".
     const almost = new Date(2026, 8, 28, 14, 29, 30);
     expect(minutesUntil("2026-09-28T14:30", almost)).toBe(1);
   });
@@ -37,8 +36,6 @@ describe("minutesUntil", () => {
   });
 
   it("reads the start as local time across a DST change", () => {
-    // A UTC parse would shift this by an hour and report a wildly wrong
-    // number, so build the expectation from local components.
     expect(minutesUntil("2026-03-29T01:30", new Date(2026, 2, 29, 1, 0))).toBe(
       30,
     );
@@ -62,7 +59,6 @@ describe("pendingReminders", () => {
   });
 
   it("drops events that have already been notified", () => {
-    // A sweep can overlap itself while a notification is in flight.
     const result = pendingReminders(
       [event({ notifiedAt: "2026-09-28T14:00:00Z" })],
       NOW,
@@ -79,7 +75,6 @@ describe("pendingReminders", () => {
   });
 
   it("keeps an event starting at exactly now", () => {
-    // A zero-minute reminder lands here, and it is what "Starting now" means.
     const result = pendingReminders(
       [event({ startTime: "2026-09-28T14:00" })],
       NOW,

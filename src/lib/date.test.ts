@@ -48,7 +48,7 @@ describe("arithmetic", () => {
   it("builds a Monday-first 6x7 month grid", () => {
     const grid = monthGrid(new Date(2026, 8, 1));
     expect(grid).toHaveLength(42);
-    // 1 September 2026 is a Tuesday, so the grid starts on Monday 31 August.
+
     expect(toDateKey(grid[0]!)).toBe("2026-08-31");
     const first = grid[0]!;
     expect(WEEKDAY_LABELS[(first.getDay() + 6) % 7]).toBe("Mon");

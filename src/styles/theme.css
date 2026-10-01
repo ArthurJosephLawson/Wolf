@@ -1,21 +1,6 @@
-/*
- * Wolf's single, cohesive retro theme.
- *
- * There is one palette, not a set of them. Every colour is taken from the
- * wolf sprite's own 8 colours (see `src/assets/wolf/sprites.ts`) so the
- * character and the interface cannot drift apart: the sprite's fur is the
- * interface's outline, its cream is the interface's text, its pink cheek is
- * the interface's accent.
- *
- * The six `--*-primary`/`--accent-*` names at the top are the canonical
- * variables. The shorter names below are aliases kept for the several hundred
- * existing `var()` references, so there is still only one source of truth.
- */
-
 :root {
   color-scheme: dark;
 
-  /* Canonical palette — the values from the sprite, verbatim. */
   --bg-primary: #1c2024;
   --bg-secondary: #2a2f35;
   --border-color: #4a5056;
@@ -23,7 +8,6 @@
   --text-primary: #f2f0e8;
   --accent-pink: #e27d85;
 
-  /* Remaining sprite colours. */
   --outline: #1a1a1a;
   --fur-mid: #8c939a;
   --fur-light: #d8dcde;
@@ -31,33 +15,24 @@
   --muzzle-dark: #802a30;
   --breath-blue: #7fa9c4;
 
-  /* Surfaces. */
   --bg: var(--bg-primary);
   --bg-raised: var(--bg-secondary);
   --bg-sunken: #14171a;
   --panel: #24282d;
   --panel-alt: var(--bg-secondary);
 
-  /* Edges. */
   --border: var(--border-color);
   --border-strong: #6b7379;
 
-  /* Text. */
   --text: var(--text-primary);
   --text-dim: #b8bcc0;
   --text-faint: #7c8388;
 
-  /* Actions. Pressed areas invert: light fill, dark text. */
   --primary: var(--accent-color);
   --primary-dim: var(--fur-mid);
   --secondary: var(--breath-blue);
   --accent: var(--accent-pink);
 
-  /*
-   * Status colours are deliberately drawn from the same eight colours. Blue
-   * reads as "fine", cream as "attention", pink as "problem", so the states
-   * stay distinguishable without introducing a colour the wolf does not have.
-   */
   --success: var(--breath-blue);
   --success-dim: #4e6b7d;
   --warning: var(--accent-color);
@@ -65,17 +40,11 @@
   --danger: var(--accent-pink);
   --danger-dim: var(--muzzle-dark);
 
-  /* Shape. Nothing in this interface is round. */
   --shadow: #000000;
   --pixel: 2px;
   --radius: 0px;
   --focus: var(--accent-pink);
 
-  /*
-   * The hard-shadow geometry. A raised surface throws a 3px black shadow down
-   * and to the right; pressing it moves it exactly that far and drops the
-   * shadow, which is what makes the press read as a depression.
-   */
   --shadow-offset: 3px;
   --shadow-hard: var(--shadow-offset) var(--shadow-offset) 0 0 var(--shadow);
 }

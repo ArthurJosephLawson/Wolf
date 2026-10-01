@@ -1,4 +1,3 @@
-/** Create/edit dialog for a calendar event. */
 import { useState } from "react";
 import { Field, Modal } from "../../components/ui";
 import { isDateTimeKey, toDateTimeKey } from "../../lib/date";
@@ -16,7 +15,7 @@ const REMINDER_CHOICES: readonly { value: number; label: string }[] = [
 interface EventFormDialogProps {
   open: boolean;
   event: CalendarEvent | null;
-  /** Default start, used when creating. */
+
   defaultDate: string;
   onClose: () => void;
   onSubmit: (value: NewCalendarEvent) => Promise<boolean>;
@@ -49,7 +48,6 @@ export function EventFormDialog({
   const invalid =
     !isDateTimeKey(startTime) ||
     !isDateTimeKey(endTime) ||
-    // An end before the start is the only ordering rule the app enforces.
     (endTime.slice(0, 10) === startTime.slice(0, 10) &&
       endTime.slice(11, 16) < startTime.slice(11, 16));
 

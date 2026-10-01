@@ -60,7 +60,7 @@ pub struct FocusStats {
     pub total_completed: u32,
     pub focus_minutes_today: u32,
     pub focus_minutes_week: u32,
-    /// Per-day completed focus minutes for the last 7 days, oldest first.
+
     pub daily_minutes: Vec<DailyFocus>,
 }
 

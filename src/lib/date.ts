@@ -1,9 +1,6 @@
-/** Small, dependency-free date helpers. All dates are local calendar dates. */
-
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
-/** `YYYY-MM-DD` for a Date, in local time. */
 export function toDateKey(date: Date = new Date()): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -11,7 +8,6 @@ export function toDateKey(date: Date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
-/** `YYYY-MM-DDTHH:MM` for a Date, in local time. */
 export function toDateTimeKey(date: Date = new Date()): string {
   const h = String(date.getHours()).padStart(2, "0");
   const min = String(date.getMinutes()).padStart(2, "0");
@@ -38,13 +34,11 @@ export function isDateTimeKey(value: string): boolean {
   return isDateKey(value.slice(0, 10));
 }
 
-/** Parse `YYYY-MM-DD` into a local Date at midnight. */
 export function parseDateKey(value: string): Date {
   const [y, m, d] = value.split("-").map(Number) as [number, number, number];
   return new Date(y, m - 1, d);
 }
 
-/** Parse `YYYY-MM-DDTHH:MM` into a local Date. */
 export function parseDateTimeKey(value: string): Date {
   const date = value.slice(0, 10);
   const time = value.slice(11, 16);
@@ -72,7 +66,6 @@ export function isSameDay(a: Date, b: Date): boolean {
   );
 }
 
-/** `Mon`, `Tue`, … */
 export const WEEKDAY_LABELS = [
   "Mon",
   "Tue",
@@ -83,7 +76,6 @@ export const WEEKDAY_LABELS = [
   "Sun",
 ] as const;
 
-/** Full 6x7 grid of days covering the month, Monday-first. */
 export function monthGrid(view: Date): Date[] {
   const first = startOfMonth(view);
   const lead = (first.getDay() + 6) % 7;
@@ -91,24 +83,20 @@ export function monthGrid(view: Date): Date[] {
   return Array.from({ length: 42 }, (_, i) => addDays(start, i));
 }
 
-/** `2026-09-28T14:30` -> `14:30`. */
 export function formatTime(value: string): string {
   return value.length >= 16 ? value.slice(11, 16) : value;
 }
 
-/** `2026-09-28` -> `28 Sep`. */
 export function formatDayShort(value: string): string {
   const date = parseDateKey(value.slice(0, 10));
   return `${date.getDate()} ${date.toLocaleDateString(undefined, { month: "short" })}`;
 }
 
-/** `2026-09-28` -> `Mon 28 Sep`. */
 export function formatDayLong(value: string): string {
   const date = parseDateKey(value.slice(0, 10));
   return `${WEEKDAY_LABELS[(date.getDay() + 6) % 7]} ${date.getDate()} ${date.toLocaleDateString(undefined, { month: "short" })}`;
 }
 
-/** Relative label for a due date: `Today`, `Tomorrow`, `3d overdue`, `Mon 5 Oct`. */
 export function relativeDay(
   value: string,
   reference: Date = new Date(),
@@ -127,7 +115,6 @@ export function relativeDay(
   return formatDayShort(target);
 }
 
-/** `1500` -> `25:00`. */
 export function formatClock(totalSeconds: number): string {
   const safe = Math.max(0, Math.floor(totalSeconds));
   const minutes = Math.floor(safe / 60);
@@ -135,7 +122,6 @@ export function formatClock(totalSeconds: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-/** `4500` -> `1h 15m`. */
 export function formatDuration(seconds: number): string {
   const safe = Math.max(0, Math.floor(seconds));
   const hours = Math.floor(safe / 3600);

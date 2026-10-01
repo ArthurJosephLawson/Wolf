@@ -1,18 +1,10 @@
-//! Wolf's internal assistant prompt and local-context selection.
-//!
-//! The assistant is powered by a small local model. Small models hallucinate
-//! happily, so the prompt is explicit: only trust the `<local_context>` block,
-//! say so when the block is empty, and never invent tasks or appointments.
-
 use crate::database::Database;
 use crate::error::WolfResult;
 use crate::models::{TaskFilter, TaskListQuery, TaskSort};
 use chrono::NaiveDate;
 
-/// Maximum characters any single section may contribute, so the whole context
-/// block stays small enough for a 2B model to reason over.
 const SECTION_LIMIT: usize = 1_200;
-/// Hard ceiling on the assembled context block.
+
 const TOTAL_LIMIT: usize = 3_500;
 const MAX_EVENTS: usize = 12;
 const MAX_TASKS: usize = 25;
@@ -38,7 +30,6 @@ pub fn system_prompt() -> String {
     .to_string()
 }
 
-/// What the user asked about. Determines which slices of local data are sent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Intent {
     Today,
@@ -66,8 +57,6 @@ impl Intent {
     }
 }
 
-/// Very small keyword classifier. Kept deliberately simple and testable: it
-/// only decides *which* data to include, never what the answer is.
 pub fn classify_intent(query: &str) -> Intent {
     let q = query.to_lowercase();
     let has = |needles: &[&str]| needles.iter().any(|n| q.contains(n));
@@ -129,7 +118,6 @@ fn bullet(line: String) -> String {
     format!("- {line}")
 }
 
-/// Build the `<local_context>` block for a user question.
 pub fn build_context(db: &Database, query: &str, today: NaiveDate) -> WolfResult<String> {
     let intent = classify_intent(query);
     let today_str = today.format("%Y-%m-%d").to_string();
@@ -190,18 +178,15 @@ fn tasks_section(db: &Database, intent: Intent, today: &str) -> WolfResult<Strin
         today,
     )?;
 
-    if tasks.is_empty() {
-        // "Today" questions still benefit from seeing what else is open.
-        if filter != TaskFilter::Active {
-            tasks = db.list_tasks(
-                &TaskListQuery {
-                    filter: Some(TaskFilter::Active),
-                    sort: Some(TaskSort::Default),
-                    search: None,
-                },
-                today,
-            )?;
-        }
+    if tasks.is_empty() && filter != TaskFilter::Active {
+        tasks = db.list_tasks(
+            &TaskListQuery {
+                filter: Some(TaskFilter::Active),
+                sort: Some(TaskSort::Default),
+                search: None,
+            },
+            today,
+        )?;
     }
 
     let total_open = db
@@ -393,8 +378,7 @@ mod tests {
     #[test]
     fn upcoming_question_includes_events() {
         let db = test_db();
-        // `upcoming_events` filters from the real wall clock, so anchor the
-        // event to it instead of the fixture date to keep the test time-stable.
+
         let start = chrono::Local::now() + chrono::Duration::hours(1);
         let start = start.format("%Y-%m-%dT%H:%M").to_string();
         let end = (chrono::Local::now() + chrono::Duration::hours(2))

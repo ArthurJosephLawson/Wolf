@@ -1,14 +1,11 @@
-# Build output
 dist/
 dist-ssr/
 target/
 src-tauri/target/
 src-tauri/gen/
 
-# Dependencies
 node_modules/
 
-# Editors and OS noise
 .vscode/*
 !.vscode/extensions.json
 .idea/
@@ -16,12 +13,10 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# Logs
 *.log
 npm-debug.log*
 yarn-error.log*
 
-# Local environment
 .env
 .env.local
 .env.*.local

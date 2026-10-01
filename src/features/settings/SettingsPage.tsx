@@ -1,10 +1,3 @@
-/**
- * Settings screen.
- *
- * Every control writes through the settings store, which persists to SQLite
- * immediately and applies the parts that affect the desktop shell (companion
- * window, theme, notifications) as the value changes.
- */
 import { useEffect, useState } from "react";
 import { Panel, ErrorNote, Field, Chip } from "../../components/ui";
 import { DEFAULT_SETTINGS, useSettingsStore } from "./settingsStore";
@@ -37,7 +30,6 @@ export function SettingsPage() {
       .catch(() => setEnv(null));
   }, []);
 
-  // Keep the shared AI client pointed at the user's configuration.
   useEffect(() => {
     configureOllama(settings.ollamaUrl, settings.ollamaModel);
   }, [settings.ollamaUrl, settings.ollamaModel]);
@@ -368,8 +360,6 @@ function FocusField({
   const [draft, setDraft] = useState(String(value));
   const [renderedValue, setRenderedValue] = useState(value);
 
-  // If the value changed elsewhere (a preset, or a reset), drop the stale draft
-  // during render instead of in an effect that would repaint it.
   if (renderedValue !== value) {
     setRenderedValue(value);
     setDraft(String(value));

@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# Report whether the local toolchain and system libraries Wolf needs are present.
-#
-# Read-only: installs nothing, changes nothing. Safe to run at any time.
-# Exits non-zero if a hard requirement is missing, so it can gate CI.
+
 set -uo pipefail
 
 fail=0
@@ -25,7 +22,7 @@ if have pkg-config; then ok "pkg-config"; else bad "pkg-config"; fi
 echo
 echo "Native libraries (Tauri v2 on Linux)"
 check_lib() {
-  # $1 = human name, $2.. = pkg-config module names to try
+
   local name="$1"; shift
   local mod
   for mod in "$@"; do

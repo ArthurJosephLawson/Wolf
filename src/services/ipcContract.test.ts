@@ -1,17 +1,7 @@
-/**
- * IPC contract test.
- *
- * Nothing in the toolchain checks that the command names and argument keys used
- * in TypeScript still exist in Rust. Tauri resolves both at runtime, so a typo
- * or a rename is a production-only failure that unit tests would never see.
- * This test parses both sides and compares them, which makes the seam a
- * compile-time-like guarantee instead of a runtime surprise.
- */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-/** Walk up to the directory holding `package.json`, so the test survives a move. */
 function repoRoot(): string {
   let dir = import.meta.dirname;
   while (!existsSync(join(dir, "package.json"))) {
@@ -26,7 +16,6 @@ const ROOT = repoRoot();
 const SRC = join(ROOT, "src");
 const RUST_SRC = join(ROOT, "src-tauri", "src");
 
-/** Every `invoke("name", { key: ... })` / `invoke("name")` call in the frontend. */
 function invokedCommands(): {
   command: string;
   args: string[];
@@ -64,7 +53,6 @@ function invokedCommands(): {
   return found;
 }
 
-/** Command fn names registered with `generate_handler!`. */
 function registeredCommands(): Set<string> {
   const lib = readFileSync(join(RUST_SRC, "lib.rs"), "utf8");
   const block = lib.match(/generate_handler!\[([\s\S]*?)\]\)/)?.[1] ?? "";
@@ -73,7 +61,6 @@ function registeredCommands(): Set<string> {
   );
 }
 
-/** The function name and non-injected parameter names of a command. */
 function commandSignature(name: string): string[] | null {
   const pattern = new RegExp(`pub (?:async )?fn ${name}\\s*\\(([^)]*)\\)`);
   for (const file of readdirSync(join(RUST_SRC, "commands"))) {
@@ -93,7 +80,6 @@ function commandSignature(name: string): string[] | null {
   return null;
 }
 
-/** Tauri converts command arguments to camelCase on the JS side. */
 function toCamelCase(snake: string): string {
   return snake.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
 }
@@ -125,8 +111,7 @@ describe("IPC contract", () => {
         );
         continue;
       }
-      // `State`/`AppHandle`/`Channel` are injected, so a param list of only
-      // injected values means the command takes no arguments.
+
       const accepted = new Set(params.map(toCamelCase));
       for (const arg of call.args) {
         if (!accepted.has(arg)) {

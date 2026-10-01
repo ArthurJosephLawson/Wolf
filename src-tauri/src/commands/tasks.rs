@@ -58,7 +58,6 @@ pub fn task_stats(state: State<'_, AppState>) -> WolfResult<TaskStats> {
     state.db.task_stats(&today().format("%Y-%m-%d").to_string())
 }
 
-/// Compact rollup for the dashboard header and the AI context builder.
 #[tauri::command]
 pub fn task_overview(state: State<'_, AppState>) -> WolfResult<TaskOverview> {
     let day = today().format("%Y-%m-%d").to_string();

@@ -1,10 +1,3 @@
-/**
- * Local desktop notifications.
- *
- * Delivery is best-effort: if the freedesktop notification service is missing
- * or refuses the request, the caller receives a readable reason and the UI
- * carries on. Notifications are never a hard dependency.
- */
 import { invoke } from "./ipc";
 import { toAppError } from "../lib/errors";
 interface LocalNotification {
@@ -23,7 +16,6 @@ class NotificationsUnavailableError extends Error {
   }
 }
 
-/** Fire a notification. Throws {@link NotificationsUnavailableError} on refusal. */
 export async function notify({
   summary,
   body,
@@ -41,7 +33,6 @@ export async function notify({
   }
 }
 
-/** Fire and forget; returns false when the desktop refused. */
 export async function notifyQuiet(
   notification: LocalNotification,
 ): Promise<boolean> {
@@ -61,7 +52,6 @@ export async function notificationsAvailable(): Promise<boolean> {
   }
 }
 
-/** Wolf's own notification copy, kept in one place for consistency. */
 export const MESSAGES = {
   focusComplete(minutes: number): LocalNotification {
     return {

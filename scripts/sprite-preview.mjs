@@ -1,13 +1,4 @@
 #!/usr/bin/env node
-/**
- * Render the wolf as text, so the artwork can be reviewed without a display.
- *
- * The frames are generated in TypeScript, so the module is loaded through
- * Vite's SSR loader rather than a hand-rolled transpile step.
- *
- *   node scripts/sprite-preview.mjs              # every state
- *   node scripts/sprite-preview.mjs sad happy    # just these
- */
 
 import { createServer } from "vite";
 
@@ -63,7 +54,7 @@ console.log(`${legend}\n`);
 for (const state of states) {
   const frames = framesFor(state);
   console.log(`${state}  (${frames.length} frames)`);
-  // Side by side so a loop can be read as a sequence.
+
   const grids = frames.map((f) => render(f, PALETTE));
   for (let y = 0; y < SPRITE_HEIGHT; y += 1) {
     console.log(grids.map((g) => g[y]).join(" | "));

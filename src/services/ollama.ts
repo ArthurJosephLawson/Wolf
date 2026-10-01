@@ -1,10 +1,3 @@
-/**
- * The real {@link OllamaTransport}, backed by Tauri commands.
- *
- * The native Rust client owns all HTTP so that the only socket Wolf ever opens
- * is the one the user configured (localhost by default). Streaming arrives over
- * a Tauri `Channel`.
- */
 import { Channel, invoke } from "@tauri-apps/api/core";
 import type {
   AskAck,
@@ -42,12 +35,6 @@ export const ollamaTransport: OllamaTransport = {
     return invoke<ChatResponse>("ask_ollama", { prompt, history });
   },
 
-  /**
-   * Opens a stream. The returned ack resolves as soon as the native side has
-   * accepted the request; tokens keep arriving on `onEvent` afterwards and the
-   * stream ends with a `done` or `failed` event. Callers must therefore keep
-   * their busy state until the terminal event, not until the ack.
-   */
   async askStream(
     request: AskRequest,
     onEvent: (event: StreamEvent) => void,

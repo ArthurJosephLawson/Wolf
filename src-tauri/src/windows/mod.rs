@@ -1,9 +1,3 @@
-//! Window management: the main window, the floating companion, and the
-//! tray-driven lifecycle that ties them together.
-//!
-//! Nothing here is Wayland- or X11-specific: Tauri abstracts the differences and
-//! `always_on_top` is requested through the same API on both.
-
 use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
 
 use crate::error::{WolfError, WolfResult};
@@ -11,8 +5,6 @@ use crate::error::{WolfError, WolfResult};
 pub const MAIN_WINDOW: &str = "main";
 pub const COMPANION_WINDOW: &str = "companion";
 
-/// Base pixel size of the companion window content. The window is sized to
-/// match the sprite so clicks never land on dead transparent pixels.
 pub const COMPANION_WIDTH: u32 = 132;
 pub const COMPANION_HEIGHT: u32 = 148;
 
@@ -26,7 +18,6 @@ pub fn companion_window<R: Runtime>(app: &AppHandle<R>) -> WolfResult<tauri::Web
         .ok_or_else(|| WolfError::desktop("The Wolf companion window is not available."))
 }
 
-/// Bring the main window to the front, creating nothing (it always exists).
 pub fn show_main<R: Runtime>(app: &AppHandle<R>) -> WolfResult<()> {
     let window = main_window(app)?;
     window.unminimize().ok();
@@ -44,10 +35,6 @@ pub fn hide_main<R: Runtime>(app: &AppHandle<R>) -> WolfResult<()> {
     window.hide().map_err(|e| WolfError::desktop(e.to_string()))
 }
 
-/// Recreate the companion window on demand.
-///
-/// On a compositor that refuses a transparent, undecorated, always-on-top
-/// window we surface a readable error rather than taking the app down.
 pub fn ensure_companion<R: Runtime>(app: &AppHandle<R>) -> WolfResult<tauri::WebviewWindow<R>> {
     if let Some(existing) = app.get_webview_window(COMPANION_WINDOW) {
         if existing.is_visible().unwrap_or(false) {
@@ -79,7 +66,6 @@ pub fn ensure_companion<R: Runtime>(app: &AppHandle<R>) -> WolfResult<tauri::Web
     if let (Some(x), Some(y)) = (settings.companion_x, settings.companion_y) {
         builder = builder.position(x, y);
     } else {
-        // Default: bottom-right, comfortably inside any common work area.
         if let Some(monitor) = app.primary_monitor().ok().flatten() {
             let size = *monitor.size();
             let position = *monitor.position();
@@ -129,7 +115,6 @@ pub fn set_companion_always_on_top<R: Runtime>(app: &AppHandle<R>, value: bool) 
     Ok(())
 }
 
-/// Remember the companion position so it reopens where the user left it.
 pub fn persist_companion_position<R: Runtime>(app: &AppHandle<R>) -> WolfResult<()> {
     let Some(window) = app.get_webview_window(COMPANION_WINDOW) else {
         return Ok(());
@@ -142,8 +127,7 @@ pub fn persist_companion_position<R: Runtime>(app: &AppHandle<R>) -> WolfResult<
         return Ok(());
     };
     let scale = if scale > 0.0 { scale } else { 1.0 };
-    // A patch, not a full Settings: saving a position must not reset the user's
-    // Ollama model or focus durations.
+
     crate::state::state(app)?.patch_settings(crate::models::SettingsPatch {
         companion_x: Some(position.x as f64 / scale),
         companion_y: Some(position.y as f64 / scale),
@@ -153,10 +137,7 @@ pub fn persist_companion_position<R: Runtime>(app: &AppHandle<R>) -> WolfResult<
     Ok(())
 }
 
-/// Exit cleanly: stop the tray, hide windows, then quit the process.
 pub fn quit<R: Runtime>(app: &AppHandle<R>) {
-    // Tauri 2 removes a tray icon through the app handle rather than a
-    // `destroy` method on the icon itself.
     if app.tray_by_id(crate::tray::TRAY_ID).is_some() {
         app.remove_tray_by_id(crate::tray::TRAY_ID);
     }

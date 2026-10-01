@@ -1,4 +1,3 @@
-/** Big, high-contrast countdown. Announces phase changes to screen readers. */
 import { formatClock } from "../../lib/date";
 import { describe, type TimerSnapshot } from "./timerLogic";
 import type { FocusPhase, TimerStatus } from "../../types";

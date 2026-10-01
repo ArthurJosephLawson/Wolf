@@ -1,9 +1,3 @@
-//! Assistant support commands.
-//!
-//! The privacy requirement is that the user can always see exactly what Wolf
-//! hands to the local model. `assistant_context` returns that block verbatim
-//! for any question, before any model is contacted.
-
 use tauri::State;
 
 use crate::assistant;
@@ -11,7 +5,6 @@ use crate::commands::today;
 use crate::error::WolfResult;
 use crate::state::AppState;
 
-/// The `<local_context>` block Wolf would send for `query`.
 #[tauri::command]
 pub fn assistant_context(
     state: State<'_, AppState>,

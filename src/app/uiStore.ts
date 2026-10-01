@@ -1,4 +1,3 @@
-/** UI store: routing, toasts and transient banners. */
 import { create } from "zustand";
 import type { Route } from "../types";
 
@@ -39,8 +38,6 @@ export const useUiStore = create<UiStore>((set, get) => ({
   },
 
   pushToast(toast) {
-    // Read the id outside the updater: `set` is a writer, and reading state
-    // from inside an updater would capture a stale snapshot.
     const id = get().nextToastId;
     set((state) => ({
       toasts: [...state.toasts, { ...toast, id }],
@@ -58,7 +55,6 @@ export const useUiStore = create<UiStore>((set, get) => ({
   },
 }));
 
-/** A short greeting used across the UI, aware of the user's name and hour. */
 export function greeting(name: string, hour = new Date().getHours()): string {
   const part =
     hour < 5

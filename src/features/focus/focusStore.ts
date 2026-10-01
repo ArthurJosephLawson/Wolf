@@ -1,4 +1,3 @@
-/** Focus timer store: wraps the pure state machine and persists sessions. */
 import { create } from "zustand";
 import { focusService } from "../../services/focus";
 import { MESSAGES, notifyQuiet } from "../../services/notify";
@@ -30,7 +29,7 @@ interface FocusStore {
   sessions: FocusSession[];
   stats: FocusStats | null;
   error: string | null;
-  /** Set when a phase just completed, so the UI can celebrate exactly once. */
+
   lastCompletedPhase: FocusPhase | null;
 
   init: (settings: Settings) => void;
@@ -53,8 +52,6 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   lastCompletedPhase: null,
 
   init(settings) {
-    // Re-initialising on every settings change would discard a running timer,
-    // so only rebuild when the durations actually differ.
     if (JSON.stringify(get().settings) === JSON.stringify(settings)) return;
     set({
       settings,
@@ -115,7 +112,6 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
       return;
     }
 
-    // The status flips synchronously, so a slow `await` can never double-record.
     set({ snapshot: ticked, lastCompletedPhase: before.phase });
 
     if (before.startedAt !== null && before.phase !== "idle") {
@@ -153,8 +149,6 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   },
 }));
 
-/* ------------------------------------------------------------- selectors --- */
-
 interface TimerView {
   phase: FocusPhase;
   status: TimerStatus;
@@ -166,12 +160,6 @@ interface TimerView {
   untilLongBreak: number;
 }
 
-/**
- * Derived timer values.
- *
- * Subscribes to the individual primitives so the timer component re-renders
- * once per tick rather than on unrelated store changes.
- */
 export function selectTimerView(state: FocusStore): TimerView {
   const { snapshot } = state;
   return {

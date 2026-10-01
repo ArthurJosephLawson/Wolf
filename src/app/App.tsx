@@ -1,10 +1,3 @@
-/**
- * Main application shell.
- *
- * Owns startup (settings, theme, Ollama probe) and routing. Route changes never
- * reload data — each page loads itself once and reads from the stores, so
- * switching screens is instant.
- */
 import { useEffect, useMemo } from "react";
 import { useTaskStore } from "../features/tasks/taskStore";
 import { HomePage } from "../features/home/HomePage";
@@ -39,7 +32,6 @@ export function App() {
   const ollama = useOllamaSummary();
   const checkOllama = useOllamaStore((s) => s.check);
 
-  // Startup: settings first, because everything else depends on them.
   useEffect(() => {
     void loadSettings();
   }, [loadSettings]);
@@ -64,15 +56,11 @@ export function App() {
     checkOllama,
   ]);
 
-  // `data-window` lets the CSS tell the main window from the companion, which
-  // share one stylesheet but not one layout.
   useEffect(() => {
     document.documentElement.dataset.window = "main";
     document.body.dataset.window = "main";
   }, []);
 
-  // The wolf needs periodic re-evaluation for time-based rules (quiet hours,
-  // transient state expiry) in this window too.
   useEffect(() => {
     const id = window.setInterval(
       () => useWolfStore.getState().reevaluate(),
@@ -81,8 +69,6 @@ export function App() {
     return () => window.clearInterval(id);
   }, []);
 
-  // The focus store holds its own copy of the durations, so the companion
-  // window's copy stays correct without a round trip to SQLite.
   useEffect(() => {
     useFocusStore.getState().init(settings);
   }, [settings]);

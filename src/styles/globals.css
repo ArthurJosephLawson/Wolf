@@ -1,15 +1,7 @@
-/* Global resets, layout shell and shared component styles. */
-
 @import "./theme.css";
 @import "./pixel.css";
 @import "./animations.css";
 
-/*
- * Silkscreen is bundled rather than fetched, so the interface renders
- * identically offline. `font-display: block` is deliberate: a swap would show
- * a smooth monospace frame first, which breaks the illusion far more
- * noticeably than a brief blank.
- */
 @font-face {
   font-family: "Silkscreen";
   src: url("../assets/fonts/Silkscreen-Regular.ttf") format("truetype");
@@ -27,7 +19,6 @@
 }
 
 :root {
-  /* Silkscreen has no bold or italic cut, so both map to the bold face. */
   --font-pixel:
     "Silkscreen", ui-monospace, "SFMono-Regular", "Menlo", monospace;
   --font-ui: "Silkscreen", ui-monospace, "SFMono-Regular", "Menlo", monospace;
@@ -62,7 +53,6 @@ body {
   overflow: hidden;
 }
 
-/* The companion window is transparent and must never show a background. */
 body[data-window="companion"] {
   background: transparent;
   overflow: hidden;
@@ -102,13 +92,10 @@ textarea {
   color: inherit;
 }
 
-/* Visible, high-contrast focus for keyboard users. */
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
-
-/* ------------------------------------------------------------------ shell -- */
 
 .app-shell {
   display: grid;
@@ -221,8 +208,6 @@ textarea {
   gap: var(--gap);
 }
 
-/* ------------------------------------------------------------------ panels -- */
-
 .panel {
   background: var(--panel);
   border: var(--pixel) solid var(--border);
@@ -303,8 +288,6 @@ textarea {
   color: var(--text-faint);
 }
 
-/* ----------------------------------------------------------------- buttons -- */
-
 .btn {
   display: inline-flex;
   align-items: center;
@@ -326,8 +309,6 @@ textarea {
 }
 
 .btn:active:not(:disabled) {
-  /* Pressed: the button sinks into the surface and the shadow collapses into
-     an inset, so the press reads as a depression rather than a movement. */
   transform: translate(var(--shadow-offset), var(--shadow-offset));
   box-shadow: inset var(--pixel) var(--pixel) 0 0 var(--bg-sunken);
 }
@@ -341,8 +322,7 @@ textarea {
 .btn--primary {
   background: var(--primary-dim);
   border-color: var(--primary);
-  /* The primary fill is light, so the label has to be the dark outline or it
-     would be invisible. */
+
   color: var(--outline);
 }
 
@@ -377,8 +357,6 @@ textarea {
   padding: 2px 6px;
   font-size: 11px;
 }
-
-/* ------------------------------------------------------------------ inputs -- */
 
 .input,
 .select,
@@ -425,8 +403,6 @@ textarea {
   color: var(--text-faint);
 }
 
-/* ------------------------------------------------------------------- chips -- */
-
 .chip {
   display: inline-flex;
   align-items: center;
@@ -467,8 +443,6 @@ textarea {
   border-color: var(--primary);
 }
 
-/* ------------------------------------------------------------------ lists --- */
-
 .list {
   list-style: none;
   margin: 0;
@@ -495,8 +469,6 @@ textarea {
   color: var(--text-faint);
   font-size: 12px;
 }
-
-/* ------------------------------------------------------------- wolf widget -- */
 
 .wolf {
   display: flex;
@@ -537,8 +509,6 @@ textarea {
 .wolf__dot[data-tone="off"] {
   background: var(--danger);
 }
-
-/* ---------------------------------------------------------- companion win --- */
 
 .companion-root {
   width: 100%;
@@ -600,8 +570,6 @@ textarea {
   background: var(--panel-alt);
 }
 
-/* ------------------------------------------------------------------ toasts -- */
-
 .toasts {
   position: fixed;
   right: 12px;
@@ -656,8 +624,6 @@ textarea {
   color: var(--text);
 }
 
-/* ------------------------------------------------------------------ modal --- */
-
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -677,8 +643,6 @@ textarea {
   box-shadow: var(--shadow-hard);
   padding: 12px;
 }
-
-/* -------------------------------------------------------------- utilities --- */
 
 .visually-hidden {
   position: absolute;
@@ -711,7 +675,6 @@ textarea {
   border: 2px solid var(--bg-sunken);
 }
 
-/* Browser fallback surfaces when the app runs without the Tauri shell. */
 .standalone-notice {
   margin: 40px auto;
   max-width: 620px;

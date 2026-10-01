@@ -25,7 +25,6 @@ impl HabitFrequency {
         }
     }
 
-    /// Is `weekday` (0 = Monday .. 6 = Sunday) a scheduled day?
     pub fn is_due_on(self, weekday: chrono::Weekday) -> bool {
         match self {
             HabitFrequency::Daily => true,
@@ -81,7 +80,7 @@ pub struct HabitUpdate {
 pub struct HabitCompletion {
     pub id: String,
     pub habit_id: String,
-    /// Local calendar date, `YYYY-MM-DD`.
+
     pub completed_at: String,
 }
 
@@ -90,14 +89,14 @@ pub struct HabitCompletion {
 pub struct HabitWithProgress {
     #[serde(flatten)]
     pub habit: Habit,
-    /// Local date the UI should render as "today".
+
     pub today: String,
     pub completed_today: bool,
-    /// Consecutive scheduled days completed, counting today backwards.
+
     pub current_streak: u32,
-    /// Longest streak ever recorded for this habit.
+
     pub longest_streak: u32,
-    /// Days completed out of the last 28 days, oldest first.
+
     pub recent: Vec<HabitDay>,
     pub completions_30d: u32,
 }

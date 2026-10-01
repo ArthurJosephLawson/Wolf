@@ -50,7 +50,6 @@ pub fn delete_event(state: State<'_, AppState>, id: String) -> WolfResult<()> {
     state.db.delete_event(&id)
 }
 
-/// Per-day rollup (events + task counts) for a month grid.
 #[tauri::command]
 pub fn month_summaries(
     state: State<'_, AppState>,
@@ -72,7 +71,6 @@ pub fn month_summaries(
     .expect("valid rollover")
         - chrono::Duration::days(1);
 
-    // Pad to whole weeks so the grid is always a clean rectangle.
     let lead = first.weekday().num_days_from_monday() as i64;
     let from = first - chrono::Duration::days(lead);
     let to = last + chrono::Duration::days(6 - last.weekday().num_days_from_monday() as i64);
@@ -80,7 +78,6 @@ pub fn month_summaries(
     state.db.day_summaries(from, to)
 }
 
-/// Events for one specific day, used by the day-detail panel.
 #[tauri::command]
 pub fn events_for_day(state: State<'_, AppState>, date: String) -> WolfResult<Vec<CalendarEvent>> {
     state.db.list_events(&EventListQuery {
@@ -90,8 +87,6 @@ pub fn events_for_day(state: State<'_, AppState>, date: String) -> WolfResult<Ve
     })
 }
 
-/// Reminder sweep, called by the frontend scheduler. Returns the ids of events
-/// whose reminder is due and has not been delivered yet.
 #[tauri::command]
 pub fn due_event_reminders(state: State<'_, AppState>) -> WolfResult<Vec<CalendarEvent>> {
     let now = chrono::Local::now();
@@ -121,8 +116,7 @@ pub fn due_event_reminders(state: State<'_, AppState>) -> WolfResult<Vec<Calenda
         ) else {
             continue;
         };
-        // The reminder fires `minutes` before the start; report it once the fire
-        // moment has passed but the event has not started yet.
+
         let fire_at = start - chrono::Duration::minutes(minutes as i64);
         let Some(fire_at) = fire_at.and_local_timezone(chrono::Local).earliest() else {
             continue;
@@ -139,7 +133,6 @@ pub fn mark_event_notified(state: State<'_, AppState>, id: String) -> WolfResult
     state.db.mark_event_notified(&id)
 }
 
-/// Dashboard rollup: today's events plus the next few upcoming ones.
 #[tauri::command]
 pub fn calendar_overview(state: State<'_, AppState>) -> WolfResult<CalendarOverview> {
     let day = today().format("%Y-%m-%d").to_string();

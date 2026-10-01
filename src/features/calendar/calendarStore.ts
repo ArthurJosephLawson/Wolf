@@ -1,4 +1,3 @@
-/** Calendar store: month grid, selected day, and the day's events. */
 import { create } from "zustand";
 import { calendarService } from "../../services/calendar";
 import { toAppError } from "../../lib/errors";

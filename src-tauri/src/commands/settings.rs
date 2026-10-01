@@ -20,10 +20,6 @@ pub fn save_settings(
     Ok(saved)
 }
 
-/// Resolve a model name against what is actually installed, then persist it.
-///
-/// Wolf never installs models for you, but it does resolve friendly names such
-/// as `qwen2.5-coder` to the concrete installed tag (`qwen2.5-coder:7b`).
 #[tauri::command]
 pub async fn select_model(state: State<'_, AppState>, model: String) -> WolfResult<Settings> {
     let settings = state.settings();

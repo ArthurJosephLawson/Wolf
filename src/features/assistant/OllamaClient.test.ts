@@ -1,9 +1,3 @@
-/**
- * Ollama client tests.
- *
- * The client is exercised through a fake transport, so these run without a
- * daemon and cover the four UI states and the failure paths.
- */
 import { describe, expect, it, vi } from "vitest";
 import { OllamaClient, describeStatus } from "./OllamaClient";
 import {
@@ -196,8 +190,6 @@ describe("asking", () => {
   });
 
   it("keeps delivering tokens that arrive after the ack resolves", async () => {
-    // The native side acknowledges the request and then streams in the
-    // background, so the listener has to outlive the awaited promise.
     let deliver: ((event: StreamEvent) => void) | null = null;
     const client = new OllamaClient({
       transport: transport({
@@ -256,8 +248,6 @@ describe("local context", () => {
   });
 
   it("passes the resolved context and prompt through to the stream", async () => {
-    // The whole point of the wiring is that the block resolved for display is
-    // the block that is sent, so the request has to carry it explicitly.
     let sent: AskRequest | null = null;
     const client = new OllamaClient({
       transport: transport({

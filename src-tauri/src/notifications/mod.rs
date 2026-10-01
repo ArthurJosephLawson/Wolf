@@ -1,17 +1,9 @@
-//! Local desktop notifications.
-//!
-//! Wolf uses the freedesktop notification service through D-Bus, which works on
-//! both X11 and Wayland sessions. The notification subsystem is strictly
-//! optional: every failure is logged and reported, never propagated as a fatal
-//! error, so Wolf stays usable on a headless box with no notification daemon.
-
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use tauri::{AppHandle, Manager, Runtime};
 
 static AVAILABLE: AtomicBool = AtomicBool::new(true);
 
-/// Payload for a local notification.
 #[derive(Debug, Clone)]
 pub struct Notification {
     pub summary: String,
@@ -34,14 +26,10 @@ impl Notification {
     }
 }
 
-/// Report whether notifications are believed to be working. The UI uses this
-/// to avoid nagging users on systems with no notification daemon.
 pub fn is_available() -> bool {
     AVAILABLE.load(Ordering::Relaxed)
 }
 
-/// Try to show a notification. Returns `Ok(())` when it was handed to the
-/// desktop, or `Err` with a readable reason when notifications are unavailable.
 pub fn notify<R: Runtime>(app: &AppHandle<R>, notification: Notification) -> Result<(), String> {
     let state = app
         .try_state::<crate::state::AppState>()
@@ -77,7 +65,6 @@ pub fn notify<R: Runtime>(app: &AppHandle<R>, notification: Notification) -> Res
     }
 }
 
-/// Never surface a raw D-Bus error; translate the common shapes into advice.
 fn describe_notify_error(raw: &str) -> String {
     if raw.contains("ServiceUnknown") || raw.contains("NameHasNoOwner") {
         "No notification service is running on this desktop.".to_string()

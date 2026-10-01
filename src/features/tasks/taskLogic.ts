@@ -1,6 +1,3 @@
-/**
- * Task presentation logic, kept out of the components so it can be tested.
- */
 import type { Task, TaskFilter, TaskPriority, TaskSort } from "../../types";
 import { PRIORITY_LABELS } from "../../types";
 import { parseDateKey, relativeDay, toDateKey } from "../../lib/date";
@@ -13,8 +10,6 @@ interface TaskView {
   dueToday: boolean;
 }
 
-/** Apply filter + sort client-side. The Rust layer also filters, but the UI
- *  needs an identical implementation for optimistic updates. */
 export function filterAndSort(
   tasks: Task[],
   filter: TaskFilter,
@@ -117,7 +112,6 @@ export function prioritySymbol(priority: TaskPriority): string {
   return ["▁", "▂", "▃", "█"][priority] ?? "▂";
 }
 
-/** How loaded today is, used to pick the wolf's default pose. */
 export function dayPressure(stats: {
   dueToday: number;
   overdue: number;
@@ -128,7 +122,6 @@ export function dayPressure(stats: {
   return "busy";
 }
 
-/** Days between two `YYYY-MM-DD` keys, negative when `b` is in the past. */
 export function daysBetween(a: string, b: string): number {
   return Math.round(
     (parseDateKey(b).getTime() - parseDateKey(a).getTime()) / 86_400_000,

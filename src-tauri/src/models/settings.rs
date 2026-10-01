@@ -1,11 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-/// User-owned settings, persisted in the local `settings` table as JSON.
-/// Nothing here is ever sent anywhere except the configured local Ollama URL.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
-    /// Base URL of the local Ollama daemon.
     pub ollama_url: String,
     pub ollama_model: String,
     pub fallback_model: String,
@@ -13,7 +10,7 @@ pub struct Settings {
     pub focus_minutes: u32,
     pub short_break_minutes: u32,
     pub long_break_minutes: u32,
-    /// Focus sessions completed before a long break is offered.
+
     pub sessions_before_long_break: u32,
 
     pub notifications_enabled: bool,
@@ -30,7 +27,6 @@ pub struct Settings {
     pub close_to_tray: bool,
     pub auto_check_ollama: bool,
 
-    /// Optional display name used in greetings.
     pub user_name: String,
 }
 
@@ -66,7 +62,6 @@ impl Default for Settings {
 }
 
 impl Settings {
-    /// Clamp every field into a range the rest of the app can rely on.
     pub fn sanitized(mut self) -> Self {
         let url = self.ollama_url.trim().to_string();
         self.ollama_url = if url.is_empty() {
@@ -97,10 +92,6 @@ impl Settings {
 }
 
 impl Settings {
-    /// Apply only the fields the patch actually carries.
-    ///
-    /// `None` means "leave alone" — this is what keeps a companion-position
-    /// save from wiping the user's Ollama model or focus durations.
     pub fn apply_patch(&mut self, patch: SettingsPatch) {
         if let Some(v) = patch.ollama_url {
             self.ollama_url = v;
@@ -162,9 +153,6 @@ impl Settings {
     }
 }
 
-/// A partial settings update: every field is optional, and a missing field is
-/// left untouched. Used for internal updates such as remembering the companion
-/// position, where the caller genuinely only knows one or two values.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct SettingsPatch {

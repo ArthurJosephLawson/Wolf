@@ -1,10 +1,3 @@
-/**
- * Task creation / editing dialog.
- *
- * One form serves both, so validation and the date/priority conventions only
- * live in a single place. The parent mounts this only while it is open, so the
- * form starts from the task it was given without a reset effect.
- */
 import { useState } from "react";
 import { Field, Modal } from "../../components/ui";
 import {
@@ -17,7 +10,7 @@ import { isDateKey, todayKey } from "../../lib/date";
 
 interface TaskFormDialogProps {
   open: boolean;
-  /** `null` creates a new task. */
+
   task: Task | null;
   onClose: () => void;
   onSubmit: (value: NewTask) => Promise<boolean>;

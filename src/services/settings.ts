@@ -10,7 +10,6 @@ export const settingsService = {
     return invoke<Settings>("save_settings", { settings });
   },
 
-  /** Resolve a friendly model name to the installed tag and persist it. */
   selectModel(model: string): Promise<Settings> {
     return invoke<Settings>("select_model", { model });
   },

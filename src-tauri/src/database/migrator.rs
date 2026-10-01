@@ -1,10 +1,3 @@
-//! Forward-only SQL migrator.
-//!
-//! Migrations live in `migrations/*.sql` at the repository root and are embedded
-//! into the binary at compile time. They are applied in the order of the
-//! `MIGRATIONS` array, not in filename order, exactly once each. No table is
-//! ever dropped or recreated by a migration.
-
 use std::path::Path;
 
 use rusqlite::Connection;
@@ -19,7 +12,6 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ),
 ];
 
-/// Create the bookkeeping table if it does not exist yet.
 pub fn ensure_migration_table(conn: &Connection) -> WolfResult<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -30,7 +22,6 @@ pub fn ensure_migration_table(conn: &Connection) -> WolfResult<()> {
     Ok(())
 }
 
-/// Apply every migration that has not been recorded yet.
 pub fn migrate(conn: &Connection) -> WolfResult<usize> {
     ensure_migration_table(conn)?;
 
@@ -45,7 +36,7 @@ pub fn migrate(conn: &Connection) -> WolfResult<usize> {
         if already.iter().any(|n| n == name) {
             continue;
         }
-        // A migration is a single transaction: it either lands fully or not at all.
+
         let tx = conn.unchecked_transaction()?;
         tx.execute_batch(sql)?;
         tx.execute(
@@ -60,8 +51,6 @@ pub fn migrate(conn: &Connection) -> WolfResult<usize> {
     Ok(applied)
 }
 
-/// Open (creating parent directories as needed) a SQLite database at `path`
-/// with the pragmas Wolf relies on.
 pub fn open_database(path: &Path) -> WolfResult<Connection> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| {

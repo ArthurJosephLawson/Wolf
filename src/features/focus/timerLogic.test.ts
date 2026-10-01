@@ -66,7 +66,7 @@ describe("running", () => {
   it("resumes from where it was paused", () => {
     const paused = pause(start(initialSnapshot(SETTINGS), T0), T0 + 10_000);
     const resumed = start(paused, T0 + 20_000);
-    // 10s of the 25 minutes elapsed before the pause; 30s more before resume.
+
     expect(tick(resumed, T0 + 50_000).remaining).toBe(1500 - 40);
   });
 

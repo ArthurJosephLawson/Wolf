@@ -1,4 +1,3 @@
-/** Tasks screen: filter, sort, search, create, edit, complete, delete. */
 import { useEffect, useMemo, useState } from "react";
 import { Panel, ErrorNote } from "../../components/ui";
 import { Segmented } from "./Segmented";
@@ -41,7 +40,7 @@ export function TasksPage() {
 
   useEffect(() => {
     void store.load();
-    // Mount only: the store is a singleton and reloads itself on mutation.
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

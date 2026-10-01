@@ -1,25 +1,12 @@
-/**
- * Desktop integration: windows, tray bridge, environment reporting.
- *
- * UI components call these helpers rather than touching window APIs directly, so
- * the desktop behaviour is testable and lives in exactly one place.
- */
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke, isDesktop } from "./ipc";
 import { isWolfSignal, type WolfSignal } from "../assets/wolf/animation";
 import type { EnvironmentInfo, TrayPayload } from "../types";
 
-/** Event emitted by the Rust tray module. */
 const TRAY_EVENT = "wolf://tray";
-/** Emitted when the companion window could not be created. */
+
 const COMPANION_ERROR_EVENT = "wolf://companion-error";
-/**
- * Carries a wolf signal between windows.
- *
- * The main and companion windows are separate webviews with separate JS
- * contexts, so each has its own copy of the wolf store. Without this event the
- * companion would never learn that the assistant started speaking.
- */
+
 const WOLF_SIGNAL_EVENT = "wolf://signal";
 
 export const desktopService = {
@@ -57,7 +44,6 @@ export const desktopService = {
     return invoke<EnvironmentInfo>("environment");
   },
 
-  /** Subscribe to tray activations. Returns an unsubscribe function. */
   onTray(handler: (payload: TrayPayload) => void): Promise<UnlistenFn> {
     if (!isDesktop) return Promise.resolve(() => undefined);
     return listen<TrayPayload>(TRAY_EVENT, (event) => handler(event.payload));
@@ -70,34 +56,24 @@ export const desktopService = {
     );
   },
 
-  /** Ask the companion window to change size (used by the scale setting). */
   async requestCompanionResize(scale: number): Promise<void> {
     if (!isDesktop) return;
     await emit("wolf://companion-scale", { scale });
   },
 
-  /**
-   * Tell the other windows that a wolf signal happened.
-   *
-   * Failures are swallowed on purpose: the local store has already been
-   * updated, and a companion window that is closed or mid-teardown must not
-   * turn a cosmetic signal into a rejected promise.
-   */
   async broadcastWolfSignal(signal: WolfSignal): Promise<void> {
     if (!isDesktop) return;
     try {
       await emit(WOLF_SIGNAL_EVENT, signal);
     } catch {
-      // No other window is listening, or the event channel is unavailable.
+      // A closed window makes this emit fail, which is not worth reporting.
+      return;
     }
   },
 
-  /** Subscribe to wolf signals from the other windows. */
   onWolfSignal(handler: (signal: WolfSignal) => void): Promise<UnlistenFn> {
     if (!isDesktop) return Promise.resolve(() => undefined);
     return listen<unknown>(WOLF_SIGNAL_EVENT, (event) => {
-      // Signals arrive as untyped JSON; anything unexpected is dropped rather
-      // than allowed to resolve to an arbitrary pose.
       if (!isWolfSignal(event.payload)) return;
       handler(event.payload);
     });

@@ -1,9 +1,3 @@
-//! System-tray integration.
-//!
-//! The tray is a pure desktop concern: it never imports UI code, it only emits
-//! `tauri://menu` events that the frontend reacts to, plus a couple of direct
-//! window operations that must happen even if no webview is alive.
-
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Runtime};
@@ -13,10 +7,8 @@ use crate::windows;
 
 pub const TRAY_ID: &str = "wolf-tray";
 
-/// Event name emitted when the user picks a tray entry.
 pub const TRAY_EVENT: &str = "wolf://tray";
 
-/// A tray action, forwarded verbatim to the frontend.
 #[derive(Debug, Clone, Copy, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum TrayAction {
@@ -80,7 +72,6 @@ pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> WolfResult<()> {
     Ok(())
 }
 
-/// The dedicated 22px tray bitmap, embedded so it needs no runtime file lookup.
 fn tray_icon() -> Option<tauri::image::Image<'static>> {
     const TRAY_ICON: &[u8] = include_bytes!("../../icons/tray-22.png");
     tauri::image::Image::from_bytes(TRAY_ICON).ok()
@@ -102,7 +93,6 @@ fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: tauri::menu::MenuEve
 }
 
 fn handle_tray_event<R: Runtime>(tray: &tauri::tray::TrayIcon<R>, event: TrayIconEvent) {
-    // Left click toggles the main window; the menu is on right click.
     if let TrayIconEvent::Click {
         button: MouseButton::Left,
         button_state: MouseButtonState::Up,

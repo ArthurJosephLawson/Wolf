@@ -1,8 +1,3 @@
-/**
- * The wolf widget: sprite, pose label and an optional local-AI status dot.
- *
- * Used inside the dashboard and inside the floating companion window.
- */
 import { useWolfFrame } from "./useWolfFrames";
 import { useWolfStore } from "./wolfStore";
 import { useOllamaSummary } from "../assistant/ollamaStore";
@@ -29,7 +24,7 @@ export function WolfWidget({
     <div className="wolf">
       <div
         className="wolf__sprite-wrap"
-        // The whole block is one interactive target for the companion window.
+
         onClick={onClick}
         role={onClick ? "button" : undefined}
         tabIndex={onClick ? 0 : undefined}

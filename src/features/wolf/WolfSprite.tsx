@@ -1,11 +1,3 @@
-/**
- * Renders one wolf frame as SVG.
- *
- * The sprite is 28x28 pixels; a frame collapses to a few dozen `<rect>` runs
- * instead of 784 individual pixels, which keeps the animation cheap enough to
- * run in two windows at once. Dimensions come from the sprite module so the
- * artwork can be resized without editing this file.
- */
 import { useMemo } from "react";
 import {
   SPRITE_HEIGHT,
@@ -16,11 +8,11 @@ import {
 
 interface WolfSpriteProps {
   frame: Matrix;
-  /** Rendered edge length of one sprite pixel, in CSS pixels. */
+
   scale?: number;
   className?: string;
   title?: string;
-  /** Called when the sprite is clicked (the companion window). */
+
   onClick?: () => void;
 }
 

@@ -1,10 +1,3 @@
-/**
- * Settings store.
- *
- * The single source of truth for user preferences. Settings are loaded once at
- * startup from SQLite and written back on every change, so there is exactly one
- * copy of the truth.
- */
 import { create } from "zustand";
 import { settingsService } from "../../services/settings";
 import { toAppError } from "../../lib/errors";
@@ -54,7 +47,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       const settings = await settingsService.get();
       set({ settings, loaded: true, error: null });
     } catch (error) {
-      // Never block the app on settings: fall back to defaults and say why.
       set({
         settings: DEFAULT_SETTINGS,
         loaded: true,
@@ -100,12 +92,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 }));
 
-/**
- * Focus durations, selected as primitives.
- *
- * Returning a fresh object from a selector would re-render on every store
- * change under `useSyncExternalStore`, so each field is subscribed separately.
- */
 export function useFocusDurations(): Pick<
   Settings,
   | "focusMinutes"

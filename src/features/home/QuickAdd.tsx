@@ -1,9 +1,3 @@
-/**
- * Inline task creation.
- *
- * The dashboard needs to be able to add a task without a trip to the Tasks
- * screen, so this reuses the same validation as the full dialog.
- */
 import { useState } from "react";
 import { useTaskStore } from "../tasks/taskStore";
 import { useWolfStore } from "../wolf/wolfStore";

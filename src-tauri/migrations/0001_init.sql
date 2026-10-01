@@ -1,9 +1,3 @@
--- Wolf :: migration 0001 :: core productivity schema
--- All timestamps are stored as text. Conventions:
---   * instant  -> RFC 3339 UTC, e.g. 2026-09-28T16:19:44.503Z
---   * date     -> local calendar date, e.g. 2026-09-28
---   * datetime -> naive local time, e.g. 2026-09-28T14:30
-
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS tasks (

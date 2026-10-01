@@ -149,7 +149,6 @@ impl Database {
         }
 
         sql.push_str(match sort {
-            // Open work first; within that, dated and urgent work rises up.
             TaskSort::Default => {
                 " ORDER BY completed ASC, due_date IS NULL ASC, due_date ASC, priority DESC, created_at ASC"
             }
@@ -180,8 +179,7 @@ impl Database {
     ) -> WolfResult<Task> {
         let title = title.map(validate_title).transpose()?;
         let priority = priority.map(validate_priority).transpose()?;
-        // `Some(None)` means "the caller explicitly cleared the due date";
-        // `None` means "leave it as it is".
+
         let due_date = match due_date {
             Some(Some(d)) if !d.trim().is_empty() => Some(Some(validate_date(d.trim())?)),
             Some(Some(_)) => Some(None),
@@ -192,7 +190,6 @@ impl Database {
         let completed_at = completed.map(|_| now_iso());
 
         let changed = self.with_conn(|conn| {
-            // Confirm the row exists first so callers get a clear NotFound.
             let exists: Option<String> = conn
                 .query_row("SELECT id FROM tasks WHERE id = ?1", params![id], |r| {
                     r.get(0)
@@ -234,7 +231,6 @@ impl Database {
         self.get_task(id)
     }
 
-    /// Flip completion state and stamp / clear `completed_at` accordingly.
     pub fn set_task_completed(&self, id: &str, completed: bool) -> WolfResult<Task> {
         self.update_task(id, None, None, Some(completed), None, None)
     }

@@ -7,13 +7,13 @@ pub struct CalendarEvent {
     pub title: String,
     #[serde(default)]
     pub description: String,
-    /// Naive local datetime `YYYY-MM-DDTHH:MM`.
+
     pub start_time: String,
     pub end_time: String,
     pub all_day: bool,
     #[serde(default)]
     pub reminder_minutes: Option<u32>,
-    /// Instant at which the reminder already fired, so we never double-notify.
+
     #[serde(default)]
     pub notified_at: Option<String>,
     pub created_at: String,
@@ -48,10 +48,9 @@ pub struct CalendarEventUpdate {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct EventListQuery {
-    /// Inclusive lower bound, `YYYY-MM-DD`.
     #[serde(default)]
     pub from: Option<String>,
-    /// Inclusive upper bound, `YYYY-MM-DD`.
+
     #[serde(default)]
     pub to: Option<String>,
     #[serde(default)]

@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-/// A single to-do item.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Task {
@@ -9,9 +8,9 @@ pub struct Task {
     #[serde(default)]
     pub description: String,
     pub completed: bool,
-    /// 0 low, 1 normal, 2 high, 3 urgent.
+
     pub priority: i64,
-    /// Local calendar date, `YYYY-MM-DD`.
+
     #[serde(default)]
     pub due_date: Option<String>,
     pub created_at: String,
@@ -55,7 +54,7 @@ pub struct TaskListQuery {
     pub filter: Option<crate::models::TaskFilter>,
     #[serde(default)]
     pub sort: Option<crate::models::TaskSort>,
-    /// Case-insensitive substring match against title and description.
+
     #[serde(default)]
     pub search: Option<String>,
 }

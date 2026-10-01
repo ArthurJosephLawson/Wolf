@@ -1,10 +1,3 @@
-/*
- * Animations.
- *
- * Deliberately cheap: transforms and opacity only, short durations, and the wolf
- * loop is driven by React state rather than a continuous rAF render.
- */
-
 @keyframes wolf-step {
   0% {
     transform: translateY(0);
@@ -125,7 +118,6 @@
   animation-duration: 2.4s;
 }
 
-/* Respect the user's motion preference. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

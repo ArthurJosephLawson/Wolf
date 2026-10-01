@@ -28,7 +28,6 @@ export const calendarService = {
     return invoke<void>("delete_event", { id });
   },
 
-  /** Day-by-day rollup for a whole month, padded to full weeks. */
   monthSummaries(year: number, month: number): Promise<DaySummary[]> {
     return invoke<DaySummary[]>("month_summaries", { year, month });
   },
@@ -41,7 +40,6 @@ export const calendarService = {
     return invoke<CalendarOverview>("calendar_overview");
   },
 
-  /** Events whose reminder is due and undelivered. */
   dueReminders(): Promise<CalendarEvent[]> {
     return invoke<CalendarEvent[]>("due_event_reminders");
   },

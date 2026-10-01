@@ -1,10 +1,3 @@
-/**
- * Task list.
- *
- * Completion is expressed three ways, not by colour alone: the checkbox fills,
- * the title is struck through, and the row dims. Keyboard users get a real
- * button per row action.
- */
 import { Chip, Empty } from "../../components/ui";
 import { prioritySymbol, toView } from "./taskLogic";
 import type { Task, TaskPriority } from "../../types";

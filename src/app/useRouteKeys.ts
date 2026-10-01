@@ -5,7 +5,6 @@ import { useUiStore } from "./uiStore";
 export function useRouteKeys(): void {
   const setRoute = useUiStore((s) => s.setRoute);
 
-  // Number keys 1-7 select a screen, except while a text field has focus.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey || event.altKey) return;

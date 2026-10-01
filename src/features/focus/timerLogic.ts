@@ -1,10 +1,3 @@
-/**
- * Focus timer state machine.
- *
- * Pure and framework-free: the React hook just wires it to a `setInterval` and
- * persists sessions. Keeping the transitions here means "what happens on skip
- * after a long break" is unit-testable rather than buried in an effect.
- */
 import type {
   FocusPhase,
   FocusStats,
@@ -15,15 +8,15 @@ import type {
 export interface TimerSnapshot {
   phase: FocusPhase;
   status: TimerStatus;
-  /** Seconds left in the current phase. */
+
   remaining: number;
-  /** Length of the current phase in seconds. */
+
   total: number;
-  /** Completed focus sessions in the current set. */
+
   completedInSet: number;
-  /** Epoch ms when the current run started, or null if not started. */
+
   startedAt: number | null;
-  /** Epoch ms of accumulated run time before the last pause. */
+
   accumulatedMs: number;
 }
 
@@ -56,11 +49,10 @@ export function initialSnapshot(settings: Settings): TimerSnapshot {
 
 export function start(snapshot: TimerSnapshot, now: number): TimerSnapshot {
   if (isRunning(snapshot.status)) return snapshot;
-  // From `idle`, starting means starting the first focus block.
+
   const phase: FocusPhase =
     snapshot.phase === "idle" ? "focus" : snapshot.phase;
-  // Resuming a pause keeps the seconds already banked; starting a phase fresh
-  // (idle, or the first tick after a completion) does not.
+
   const resuming = snapshot.status === "PAUSED";
   return {
     ...snapshot,
@@ -109,12 +101,6 @@ interface TransitionContext {
   settings: Settings;
 }
 
-/**
- * Which phase comes after a completed one.
- *
- * Focus counts towards the set; after `sessionsBeforeLongBreak` focus sessions
- * the user earns a long break, otherwise a short one.
- */
 export function nextPhaseAfter(
   snapshot: TimerSnapshot,
   ctx: TransitionContext,
@@ -130,7 +116,6 @@ export function nextPhaseAfter(
   return { phase: "focus", completedInSet: snapshot.completedInSet };
 }
 
-/** Begin the next phase after a completion or a manual skip. */
 export function advance(
   snapshot: TimerSnapshot,
   ctx: TransitionContext,
@@ -149,7 +134,6 @@ export function advance(
   };
 }
 
-/** Move to the next phase but leave it paused, for a deliberate skip. */
 export function skip(
   snapshot: TimerSnapshot,
   ctx: TransitionContext,
@@ -184,7 +168,6 @@ export function describe(snapshot: TimerSnapshot): string {
   }
 }
 
-/** Sessions needed before the next long break. */
 export function untilLongBreak(
   snapshot: TimerSnapshot,
   settings: Settings,
@@ -195,7 +178,6 @@ export function untilLongBreak(
   );
 }
 
-/** Human summary of this week, used on the dashboard. */
 export function focusSummary(stats: FocusStats): string {
   if (stats.completedToday === 0) return "No sessions yet today.";
   const plural = stats.completedToday === 1 ? "session" : "sessions";
