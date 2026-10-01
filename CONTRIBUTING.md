@@ -81,14 +81,22 @@ written down at the site, and this is the short version.
 `src/services/`. `src/services/ipcContract.test.ts` parses both sides of that boundary
 and fails if the frontend calls a command Rust does not register, or passes an
 argument key the Rust signature does not accept. Tauri resolves both at runtime,
-so a typo there is otherwise a production-only failure.
+so a typo there is otherwise a production-only failure. Commenting a command out of
+`generate_handler!` does not satisfy it either; only live lines count as registered.
+
+**There are almost no comments.** If your change needs one to be understood, that is
+usually a naming problem. Fix the names.
 
 **Settings are one JSON blob.** Adding a field means adding it in
 `src-tauri/src/models/settings.rs` _and_ `src/types/index.ts` _and_
 `src/features/settings/settingsStore.ts`. Nothing tests that the two default copies
-agree, so
-if you add a setting, check both by hand. Old databases will still load: Serde
-ignores fields it does not know.
+agree, so if you add a setting, check both by hand. Old databases will still load:
+Serde ignores fields it does not know.
+
+**A settings page is a panel per file.** `src/features/settings/` holds one component
+per panel, each reading the store it needs and receiving `settings` and `set` as
+props. When you add a panel, put it in its own file and keep `SettingsPage.tsx` as
+layout.
 
 **The wolf sprite is 28x28, not 24x26.** It is generated from
 `src/assets/wolf/wolf-pixels.json` and mirrored about column 13.5. The dimensions

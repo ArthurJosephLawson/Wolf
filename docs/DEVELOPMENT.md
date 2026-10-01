@@ -34,6 +34,10 @@ a few minutes, but incremental changes to the app are quick.
 5. **Store action** in `src/features/<domain>/`. Holds no rendering concerns.
 6. **Component or page**. Reads from the store, dispatches actions.
 
+Steps 5 and 6 both land in `src/features/<domain>/`, beside the store they read. Keep a
+page thin enough that each panel could be its own component; `SettingsPage.tsx` is the
+example to follow, and the panels it holds are the ones to copy.
+
 If a new field must be shared between windows, add it to `SettingsPatch` as well, or the
 companion will clobber it.
 
@@ -51,14 +55,18 @@ the components; a rendering test that duplicates it is maintenance cost with no 
 
 ## Conventions
 
-- No `any`. If a Tauri command returns something awkward, type it in `types/`.
+- No `any`. If a Tauri command returns something awkward, type it in
+  `src/types/index.ts`.
 - Errors carry a `kind` so the UI can decide between showing a message and logging it.
-- Comments explain _why_, not _what_. If a line needs a comment to be readable, rewrite
-  the line.
+- No comments. If a line is hard to read, rename something or pull it into a function.
+  The codebase currently has three, all on intentionally empty `catch` blocks, and the
+  rule for adding a fourth is that the code must be surprising without it.
 - The wolf palette is data. Add a colour to `wolf-pixels.json` and to `COLOR`, never by
   editing a PNG.
 - Nothing but `src/services/` may call `invoke`. This is checked by review, not tooling,
   so watch for it in your own diffs.
+- Use American spellings in identifiers and prose. One British holdout remains in a
+  settings label and is worth fixing if you touch that file.
 
 ## Troubleshooting
 

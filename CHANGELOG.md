@@ -7,7 +7,31 @@ this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **The frontend is grouped by responsibility** rather than by kind. `src/app/` holds
+  the shell, `src/features/<domain>/` holds each domain's page, store and logic,
+  `src/lib/` holds dependency-free helpers, and `src/services/` remains the only place
+  that names a Tauri command. No behaviour change.
+- **The Rust `ai` module is now `assistant`**, matching what it does and what the
+  frontend calls it.
+- **Comments are gone**, with three exceptions on intentionally empty `catch` blocks
+  where the swallow is the behaviour. Nothing was renamed to compensate.
+- **`SettingsPage.tsx` is split per panel**, one component per file, with the model
+  select extracted as `ModelPicker`.
+
+### Fixed
+
+- **The IPC contract test counted a commented-out command as registered**, so disabling
+  a command in `generate_handler!` passed the suite. Only live lines count now.
+
+### Removed
+
+- Dead code across both halves: `closeCompanion`, the unused date helpers,
+  `SPRITE_METADATA`, `PRIORITIES`, `OllamaModelDetail`, three of the four priority
+  constants, `apply_startup_preferences`, `count_events_in_range`,
+  `notify_best_effort`, and three of the four database test fixtures. About 30
+  `export` keywords went with them.
 
 ## [0.1.0] - 2026-09-30
 
@@ -31,9 +55,9 @@ the Ollama daemon you configure, which must be on loopback.
 - **Habit streaks and a 28-day completion grid**, with daily, weekday and weekly
   frequencies.
 - **A pixel-art wolf companion** that reacts to what you are doing. The sprite is
-  authored as a 28x28 character matrix and every one of its 32 frames is generated
+  authored as a 28x28 character matrix and every one of its 31 frames is generated
   from that single source, so the artwork cannot drift between poses. It lives in
-  its own transparent window and can be sized, renamed and positioned freely.
+  its own transparent window and can be sized and positioned freely.
 - **System tray integration**, with close-to-tray behaviour and a menu for
   toggling the companion.
 - **A generated icon set** from the same sprite data, including tray bitmaps and

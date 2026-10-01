@@ -1,6 +1,6 @@
 # Wolf
-VERSION: 1.0
-[Still in Development and Testing Phase]
+
+Version 0.1.0. Linux only, and still in development.
 
 A pixel-art productivity companion that lives on your desktop. Tasks, habits,
 calendar, a focus timer, and a local AI assistant — with a wolf that reacts to
@@ -33,19 +33,18 @@ assembles a block of your own tasks, habits, events, and focus history, then
 sends that with your question to a local Ollama model. It answers about your
 week rather than in general.
 
-**The wolf** — nine poses, 32 frames, all generated from a single 28x28
+**The wolf** — nine poses, 31 frames, all generated from a single 28x28
 character matrix. It sits in its own transparent window, so it floats over
-whatever you are doing, and you can scale, rename, reposition and pin it. It
-blinks while you listen, talks while it thinks, and looks sad when Ollama is down.
+whatever you are doing, and you can scale, reposition and pin it. It blinks
+while you listen, talks while it thinks, and looks sad when Ollama is down.
 
-## Screenshots
+## Look and feel
 
-The interface is a single dark palette with no rounded corners, because the
-palette and the shape language are both taken from the wolf's own eight colours:
-the sprite's fur is the interface's outline, its cream is the interface's text,
-and its pink cheek is the interface's accent.
-
-<!-- Screenshots to be added here. -->
+The interface is a single dark palette, because the palette and the shape
+language are both taken from the wolf's own eight colours: the sprite's fur is
+the interface's outline, its cream is the interface's text, and its pink cheek
+is the interface's accent. There is no green or amber, so blue reads as fine,
+cream as attention, and pink as problem.
 
 ## Install
 

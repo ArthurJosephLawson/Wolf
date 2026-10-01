@@ -10,7 +10,7 @@ one-directional in both halves.
 React components/pages  ->  Zustand stores  ->  service layer  ->  Tauri IPC
                                                                       |
                                                                       v
-Rust commands  ->  database + models        ai/  ->  database
+Rust commands  ->  database + models        assistant/  ->  database
 ```
 
 Nothing below a layer imports from above it. Two consequences that are worth the
@@ -33,28 +33,51 @@ for the five Ollama commands. It has to: the streaming path needs a `Channel` ob
 `ipc.ts` does not model, and keeping the assistant behind an `OllamaTransport`
 interface is what lets `OllamaClient.test.ts` run against a fake. The trade-off is that
 those command names are written in two places, so `ipcContract.test.ts` checks them
-against the Rust `invoke_handler` list.
+against the Rust `invoke_handler` list. That test reads the live block only: a
+commented-out line in `generate_handler!` is not a registration, so disabling a
+command fails the suite instead of quietly passing it.
 
 When the shell is absent, `ipc.ts` rejects with an explanatory error. That is what makes
 `npm run dev:web` degrade into a labelled "desktop unavailable" view instead of a blank
 screen. The fallback is a deliberate development affordance, not a supported mode.
 
+## Frontend layout
+
+`src/` is grouped by responsibility rather than by kind, so a feature's files sit
+together:
+
+- `src/app/` — the shell: routing, stores that are not per-feature, the two entry
+  points, and the desktop-event and reminder hooks.
+- `src/features/<domain>/` — one directory per domain. A page, a store, and the
+  logic and dialogs it needs, with `*.test.ts` beside the logic.
+- `src/services/` — the IPC layer, the only place that names a command.
+- `src/lib/` — dependency-free helpers with no React and no Tauri.
+- `src/components/` — the shared UI primitives in `ui.tsx`.
+- `src/types/index.ts` — the IPC and domain types, mirroring `src-tauri/src/models/`.
+- `src/styles/` and `src/assets/` — CSS and the sprite data.
+
+A dependency points one way: `app` → `features` → `services` → `lib`. `lib` imports
+nothing from the other three.
+
 ## State ownership
 
 State lives in exactly one place per domain, and always the same one:
 
-| Domain                                | Source of truth                             | Why                                              |
-| ------------------------------------- | ------------------------------------------- | ------------------------------------------------ |
-| Tasks, habits, events, focus sessions | SQLite                                      | Must survive restarts and be the backup format   |
-| Settings                              | SQLite, mirrored into Rust managed state    | Shared with the companion window and tray        |
-| Timer phase                           | In-memory, seeded from the last session row | Must keep ticking with no DB round-trip per tick |
-| Wolf pose                             | In-memory, derived from the above           | Pure UI reaction, nothing to persist             |
-| Chat transcript                       | In-memory                                   | Deliberately not persisted                       |
+| Domain                                | Source of truth                          | Why                                              |
+| ------------------------------------- | ---------------------------------------- | ------------------------------------------------ |
+| Tasks, habits, events, focus sessions | SQLite                                   | Must survive restarts and be the backup format   |
+| Settings                              | SQLite, mirrored into Rust managed state | Shared with the companion window and tray        |
+| Timer phase                           | In-memory, seeded from settings          | Must keep ticking with no DB round-trip per tick |
+| Wolf pose                             | In-memory, derived from the above        | Pure UI reaction, nothing to persist             |
+| Chat transcript                       | In-memory                                | Deliberately not persisted                       |
 
 The timer is the interesting case. `src/features/focus/timerLogic.ts` is a pure function of
 `(snapshot, action, now)`. React only supplies `now` on a 250 ms interval, and the store
-persists exactly once per phase transition. That is why the timer survives a remount
-without drift, and why it can be tested without a fake clock library.
+writes a focus session row exactly once, when a phase reaches `COMPLETED`. Because
+remaining time is recomputed from `accumulatedMs` plus the wall clock rather than
+decremented, the timer cannot drift, and it survives a component remount inside the
+same window. It does not survive closing the app: a phase in progress is lost, which is
+a deliberate trade for keeping the tick path off the database.
 
 ## Settings patching
 
@@ -122,3 +145,9 @@ silently destroyed, because the file is the user's backup.
   stubbed `fetch`.
 - No component-rendering tests. The value would not justify the tooling weight for a
   single-window-per-domain app, and the logic worth testing is already extracted.
+- The contract test guards the seam both type systems cannot: `ipcContract.test.ts`
+  reads every `invoke` call in `src/` and every entry in `generate_handler!`, so a
+  rename on either side is a test failure rather than a runtime error.
+
+Counts today: 114 frontend tests, 81 Rust tests, neither needing a display or a
+daemon.

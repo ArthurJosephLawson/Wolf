@@ -67,7 +67,7 @@ export function DesktopSettings({
         onChange={(value) => set("closeToTray", value)}
       />
       <Toggle
-        label="Start minimised"
+        label="Start minimized"
         checked={settings.startMinimized}
         onChange={(value) => set("startMinimized", value)}
       />
