@@ -14,11 +14,8 @@ pub mod ollama;
 pub mod settings;
 pub mod task;
 
-/// Zero-based priority, lower is more urgent. Mirrored in `src/types/task.ts`.
-pub const PRIORITY_LOW: i64 = 0;
+/// Zero-based priority, lower is more urgent. Mirrored in `src/types/index.ts`.
 pub const PRIORITY_NORMAL: i64 = 1;
-pub const PRIORITY_HIGH: i64 = 2;
-pub const PRIORITY_URGENT: i64 = 3;
 
 pub fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)

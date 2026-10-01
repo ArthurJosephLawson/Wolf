@@ -9,7 +9,7 @@ import { Chip, Empty } from "../../components/ui";
 import { prioritySymbol, toView } from "./taskLogic";
 import type { Task, TaskPriority } from "../../types";
 
-export interface TaskListProps {
+interface TaskListProps {
   tasks: Task[];
   onToggle: (task: Task) => void;
   onEdit: (task: Task) => void;

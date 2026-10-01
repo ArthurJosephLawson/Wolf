@@ -10,9 +10,9 @@ import { isWolfSignal, type WolfSignal } from "../assets/wolf/animation";
 import type { EnvironmentInfo, TrayPayload } from "../types";
 
 /** Event emitted by the Rust tray module. */
-export const TRAY_EVENT = "wolf://tray";
+const TRAY_EVENT = "wolf://tray";
 /** Emitted when the companion window could not be created. */
-export const COMPANION_ERROR_EVENT = "wolf://companion-error";
+const COMPANION_ERROR_EVENT = "wolf://companion-error";
 /**
  * Carries a wolf signal between windows.
  *
@@ -20,7 +20,7 @@ export const COMPANION_ERROR_EVENT = "wolf://companion-error";
  * contexts, so each has its own copy of the wolf store. Without this event the
  * companion would never learn that the assistant started speaking.
  */
-export const WOLF_SIGNAL_EVENT = "wolf://signal";
+const WOLF_SIGNAL_EVENT = "wolf://signal";
 
 export const desktopService = {
   isDesktop,

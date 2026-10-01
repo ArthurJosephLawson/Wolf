@@ -7,13 +7,13 @@
  */
 import { invoke } from "./ipc";
 import { toAppError } from "../lib/errors";
-export interface LocalNotification {
+interface LocalNotification {
   summary: string;
   body: string;
   urgent?: boolean;
 }
 
-export class NotificationsUnavailableError extends Error {
+class NotificationsUnavailableError extends Error {
   readonly reason: string;
 
   constructor(reason: string) {

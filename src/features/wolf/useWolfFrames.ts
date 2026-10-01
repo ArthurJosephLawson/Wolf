@@ -19,7 +19,7 @@ import {
   type WolfState,
 } from "../../assets/wolf/sprites";
 
-export interface WolfFrameView {
+interface WolfFrameView {
   frame: Matrix;
   index: number;
   count: number;

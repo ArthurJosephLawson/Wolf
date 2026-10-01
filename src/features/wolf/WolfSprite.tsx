@@ -14,7 +14,7 @@ import {
   type Matrix,
 } from "../../assets/wolf/sprites";
 
-export interface WolfSpriteProps {
+interface WolfSpriteProps {
   frame: Matrix;
   /** Rendered edge length of one sprite pixel, in CSS pixels. */
   scale?: number;

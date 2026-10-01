@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import type { Route } from "../types";
 
-export type ToastTone = "info" | "success" | "warning" | "error";
+type ToastTone = "info" | "success" | "warning" | "error";
 
 export interface Toast {
   id: number;

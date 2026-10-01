@@ -62,7 +62,3 @@ export function toAppError(
 
   return new WolfAppError("unknown", fallback);
 }
-
-export function errorMessage(unknown: unknown, fallback?: string): string {
-  return toAppError(unknown, fallback).message;
-}

@@ -155,7 +155,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
 
 /* ------------------------------------------------------------- selectors --- */
 
-export interface TimerView {
+interface TimerView {
   phase: FocusPhase;
   status: TimerStatus;
   running: boolean;

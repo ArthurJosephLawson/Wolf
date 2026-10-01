@@ -17,20 +17,6 @@ pub struct OllamaModel {
     pub modified_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct OllamaModelDetail {
-    pub name: String,
-    #[serde(default)]
-    pub family: Option<String>,
-    #[serde(default)]
-    pub parameter_size: Option<String>,
-    #[serde(default)]
-    pub quantization: Option<String>,
-    #[serde(default)]
-    pub size: u64,
-}
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum OllamaState {

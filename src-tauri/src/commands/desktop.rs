@@ -1,7 +1,7 @@
 //! Desktop integration commands: window control, tray bridge, notifications and
 //! environment reporting.
 
-use tauri::{AppHandle, Emitter, Manager, Runtime, State};
+use tauri::{AppHandle, Manager, Runtime, State};
 
 use crate::error::{WolfError, WolfResult};
 use crate::models::Settings;
@@ -119,23 +119,6 @@ pub fn apply_settings<R: Runtime>(app: &AppHandle<R>, settings: &Settings) {
     }
     if let Err(err) = windows::set_companion_visible(app, settings.companion_enabled) {
         log::warn!("could not update companion visibility: {err}");
-    }
-}
-
-/// Startup path: honour "start minimised" and companion preference.
-pub fn apply_startup_preferences<R: Runtime>(app: &AppHandle<R>, settings: &Settings) {
-    if settings.start_minimized {
-        if let Err(err) = windows::hide_main(app) {
-            log::warn!("could not hide the main window at startup: {err}");
-        }
-    }
-    if settings.companion_enabled {
-        if let Err(err) = windows::ensure_companion(app) {
-            log::warn!("companion window unavailable: {err}");
-            let _ = app.emit("wolf://companion-error", err.to_string());
-        }
-    } else {
-        let _ = windows::set_companion_visible(app, false);
     }
 }
 

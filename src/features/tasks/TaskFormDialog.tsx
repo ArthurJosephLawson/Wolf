@@ -15,7 +15,7 @@ import {
 } from "../../types";
 import { isDateKey, todayKey } from "../../lib/date";
 
-export interface TaskFormDialogProps {
+interface TaskFormDialogProps {
   open: boolean;
   /** `null` creates a new task. */
   task: Task | null;

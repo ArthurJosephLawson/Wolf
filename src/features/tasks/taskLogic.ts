@@ -5,7 +5,7 @@ import type { Task, TaskFilter, TaskPriority, TaskSort } from "../../types";
 import { PRIORITY_LABELS } from "../../types";
 import { parseDateKey, relativeDay, toDateKey } from "../../lib/date";
 
-export interface TaskView {
+interface TaskView {
   task: Task;
   dueLabel: string;
   priorityLabel: string;
@@ -112,8 +112,6 @@ export function toView(task: Task, today = new Date()): TaskView {
     dueToday: due === key,
   };
 }
-
-export const PRIORITIES: readonly TaskPriority[] = [0, 1, 2, 3];
 
 export function prioritySymbol(priority: TaskPriority): string {
   return ["▁", "▂", "▃", "█"][priority] ?? "▂";

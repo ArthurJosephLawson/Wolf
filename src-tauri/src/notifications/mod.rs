@@ -90,13 +90,6 @@ fn describe_notify_error(raw: &str) -> String {
     }
 }
 
-/// Fire-and-forget helper for call sites where a missing notification is fine.
-pub fn notify_best_effort<R: Runtime>(app: &AppHandle<R>, notification: Notification) {
-    if let Err(reason) = notify(app, notification) {
-        log::debug!("notification skipped: {reason}");
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

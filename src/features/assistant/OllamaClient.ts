@@ -33,12 +33,12 @@ export type {
 };
 
 /** Configuration the client applies before every request. */
-export interface OllamaClientConfig {
+interface OllamaClientConfig {
   url: string;
   model: string;
 }
 
-export interface OllamaClientOptions {
+interface OllamaClientOptions {
   transport: OllamaTransport;
   config: OllamaClientConfig;
 }

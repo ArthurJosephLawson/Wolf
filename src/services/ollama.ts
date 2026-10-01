@@ -18,11 +18,6 @@ import type {
   StreamEvent,
 } from "../features/assistant/ollamaTypes";
 
-/** Canonical stream-event names, matching the Rust enum's serde tags. */
-const EVENT_TOKEN = "token";
-const EVENT_DONE = "done";
-const EVENT_FAILED = "failed";
-
 export const ollamaTransport: OllamaTransport = {
   async status(
     url: string | null,
@@ -62,5 +57,3 @@ export const ollamaTransport: OllamaTransport = {
     return invoke<AskAck>("ask_ollama_stream", { request, channel });
   },
 };
-
-export { EVENT_TOKEN, EVENT_DONE, EVENT_FAILED };

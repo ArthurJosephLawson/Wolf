@@ -164,11 +164,6 @@ export interface CalendarEventUpdate {
   reminderMinutes?: number | null;
 }
 
-export interface EventListQuery {
-  from?: string;
-  to?: string;
-}
-
 export interface DaySummary {
   date: string;
   events: CalendarEvent[];
@@ -327,17 +322,6 @@ export interface EnvironmentInfo {
   dataDir: string;
   notificationsAvailable: boolean;
 }
-
-export type TrayAction =
-  | "open"
-  | "showCompanion"
-  | "hideCompanion"
-  | "startFocus"
-  | "pauseFocus"
-  | "toggleCompanion"
-  | "todayTasks"
-  | "settings"
-  | "quit";
 
 export interface TrayPayload {
   route?: "tasks" | "settings";

@@ -8,7 +8,7 @@ import { useWolfStore } from "./wolfStore";
 import { useOllamaSummary } from "../assistant/ollamaStore";
 import { WolfSprite } from "./WolfSprite";
 
-export interface WolfWidgetProps {
+interface WolfWidgetProps {
   scale?: number;
   showStatus?: boolean;
   onClick?: () => void;

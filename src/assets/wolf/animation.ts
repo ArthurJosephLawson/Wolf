@@ -15,7 +15,7 @@ import type { WolfState } from "./sprites";
  * `framesFor(state)`; if the two ever disagree in length the shorter one
  * repeats, so timing can be tuned without a matching artwork change.
  */
-export const FRAME_DURATIONS: Record<WolfState, readonly number[]> = {
+const FRAME_DURATIONS: Record<WolfState, readonly number[]> = {
   // 1200ms cycle with a 200ms hold on the fully inflated frame.
   idle: [300, 350, 200, 350],
   // 100ms per frame: a blink has to read as instant at any size.
@@ -34,7 +34,7 @@ export const FRAME_DURATIONS: Record<WolfState, readonly number[]> = {
   sad: [500, 500, 500, 500],
 };
 
-export interface FrameTiming {
+interface FrameTiming {
   /** Milliseconds each frame is shown, in frame order. */
   durations: readonly number[];
   /** How long a state persists before falling back to `idle`. `null` = sticky. */

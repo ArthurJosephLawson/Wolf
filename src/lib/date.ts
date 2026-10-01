@@ -1,6 +1,5 @@
 /** Small, dependency-free date helpers. All dates are local calendar dates. */
 
-export const DATE_PATTERN = "YYYY-MM-DD";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
@@ -61,23 +60,8 @@ export function addDays(date: Date, days: number): Date {
   return next;
 }
 
-export function addMonths(date: Date, months: number): Date {
-  const next = new Date(date.getFullYear(), date.getMonth() + months, 1);
-  const lastDay = new Date(
-    next.getFullYear(),
-    next.getMonth() + 1,
-    0,
-  ).getDate();
-  next.setDate(Math.min(date.getDate(), lastDay));
-  return next;
-}
-
 export function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-export function endOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
 }
 
 export function isSameDay(a: Date, b: Date): boolean {
@@ -105,10 +89,6 @@ export function monthGrid(view: Date): Date[] {
   const lead = (first.getDay() + 6) % 7;
   const start = addDays(first, -lead);
   return Array.from({ length: 42 }, (_, i) => addDays(start, i));
-}
-
-export function daysInMonth(year: number, month: number): number {
-  return new Date(year, month + 1, 0).getDate();
 }
 
 /** `2026-09-28T14:30` -> `14:30`. */
@@ -162,15 +142,4 @@ export function formatDuration(seconds: number): string {
   const minutes = Math.floor((safe % 3600) / 60);
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
-}
-
-/** RFC 3339 instant -> local `HH:MM`. */
-export function formatInstant(instant: string): string {
-  const date = new Date(instant);
-  if (Number.isNaN(date.getTime())) return "";
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-}
-
-export function nowInstant(): string {
-  return new Date().toISOString();
 }

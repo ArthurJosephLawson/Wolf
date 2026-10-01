@@ -16,7 +16,7 @@
 
 import spriteData from "./wolf-pixels.json";
 
-export type Pixel = string;
+type Pixel = string;
 
 /** A sprite frame: one string per row, all of equal length. */
 export type Matrix = readonly string[];
@@ -30,7 +30,7 @@ export type Matrix = readonly string[];
  */
 type Rows = string[];
 
-export interface WolfSpriteData {
+interface WolfSpriteData {
   name: string;
   width: number;
   height: number;
@@ -47,7 +47,7 @@ export const PALETTE: Readonly<Record<string, string | null>> = data.palette;
 export const BASE: Matrix = data.rows;
 
 /** Colour keys the overlays rely on; every one is opaque in `wolf-pixels.json`. */
-export type ColorName =
+type ColorName =
   | "outline"
   | "fur"
   | "furLight"
@@ -160,7 +160,7 @@ export function shiftRows(
 }
 
 /** Shift a block of rows vertically, blanking both source and destination. */
-export function shiftRowsVertical(
+function shiftRowsVertical(
   matrix: Matrix,
   fromRow: number,
   toRow: number,
@@ -181,7 +181,7 @@ export function shiftRowsVertical(
  * Shift the given rows and columns of a rectangular region sideways, clipping
  * whatever falls outside the region. Used to perk or flatten the ears.
  */
-export function shiftRegionH(
+function shiftRegionH(
   matrix: Matrix,
   fromRow: number,
   toRow: number,
@@ -724,7 +724,7 @@ export function loopFor(state: WolfState): Matrix[] {
 
 /* ---------------------------------------------------------------- render --- */
 
-export interface RenderedRun {
+interface RenderedRun {
   x: number;
   y: number;
   width: number;
@@ -754,13 +754,6 @@ export function toRuns(matrix: Matrix): RenderedRun[] {
   });
   return runs;
 }
-
-export const SPRITE_METADATA = {
-  name: data.name,
-  width: SPRITE_WIDTH,
-  height: SPRITE_HEIGHT,
-  authoring: data.authoring,
-} as const;
 
 /** Sanity check used by tests and dev tooling. */
 export function validateSprite(): string[] {

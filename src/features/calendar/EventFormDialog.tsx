@@ -13,7 +13,7 @@ const REMINDER_CHOICES: readonly { value: number; label: string }[] = [
   { value: 1440, label: "1 day before" },
 ];
 
-export interface EventFormDialogProps {
+interface EventFormDialogProps {
   open: boolean;
   event: CalendarEvent | null;
   /** Default start, used when creating. */

@@ -9,7 +9,6 @@
  * Wayland and X11.
  */
 import { useEffect, useMemo } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useWolfFrame } from "./useWolfFrames";
 import { useWolfStore } from "./wolfStore";
 import { useSettingsStore } from "../settings/settingsStore";
@@ -146,14 +145,4 @@ export function Companion() {
       </div>
     </div>
   );
-}
-
-/** Escape hatch: the companion window can be closed from the main app. */
-export async function closeCompanion(): Promise<void> {
-  try {
-    const window = getCurrentWindow();
-    await window.close();
-  } catch {
-    // Not running in a webview (e.g. unit tests) — nothing to close.
-  }
 }

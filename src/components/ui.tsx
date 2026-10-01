@@ -1,7 +1,7 @@
 /** Small, dependency-free UI primitives shared across screens. */
 import { useEffect, useRef, type ReactNode } from "react";
 
-export interface PanelProps {
+interface PanelProps {
   title?: string;
   actions?: ReactNode;
   children: ReactNode;
@@ -106,7 +106,7 @@ export function ErrorNote({
   );
 }
 
-export interface ModalProps {
+interface ModalProps {
   open: boolean;
   title: string;
   onClose: () => void;

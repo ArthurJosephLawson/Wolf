@@ -42,13 +42,6 @@ export interface OllamaTransport {
   ): Promise<AskAck>;
 }
 
-export class OllamaUnavailableError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "OllamaUnavailableError";
-  }
-}
-
 /** Human-readable copy for each daemon state. */
 export const STATE_COPY: Record<
   OllamaStatus["state"],

@@ -105,7 +105,7 @@ export function tick(snapshot: TimerSnapshot, now: number): TimerSnapshot {
   return { ...snapshot, remaining: 0, status: "COMPLETED", startedAt: null };
 }
 
-export interface TransitionContext {
+interface TransitionContext {
   settings: Settings;
 }
 

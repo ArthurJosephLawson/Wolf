@@ -1,5 +1,5 @@
 use chrono::{NaiveDate, NaiveDateTime};
-use rusqlite::{params, Connection, OptionalExtension, Row};
+use rusqlite::{params, OptionalExtension, Row};
 
 use crate::database::Database;
 use crate::error::{WolfError, WolfResult};
@@ -338,20 +338,6 @@ impl Database {
             cursor += chrono::Duration::days(1);
         }
         Ok(out)
-    }
-
-    pub fn count_events_in_range(
-        &self,
-        conn: &Connection,
-        from: &str,
-        to: &str,
-    ) -> WolfResult<u32> {
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM calendar_events WHERE end_time >= ?1 AND start_time <= ?2",
-            params![from, to],
-            |r| r.get(0),
-        )?;
-        Ok(count as u32)
     }
 }
 

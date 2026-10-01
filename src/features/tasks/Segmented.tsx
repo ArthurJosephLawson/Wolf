@@ -6,14 +6,14 @@
  */
 import type { ReactNode } from "react";
 
-export interface SegmentOption<T extends string> {
+interface SegmentOption<T extends string> {
   value: T;
   label: string;
   icon?: ReactNode;
   count?: number;
 }
 
-export interface SegmentedProps<T extends string> {
+interface SegmentedProps<T extends string> {
   label: string;
   value: T;
   options: readonly SegmentOption<T>[];
