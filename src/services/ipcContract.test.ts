@@ -56,8 +56,12 @@ function invokedCommands(): {
 function registeredCommands(): Set<string> {
   const lib = readFileSync(join(RUST_SRC, "lib.rs"), "utf8");
   const block = lib.match(/generate_handler!\[([\s\S]*?)\]\)/)?.[1] ?? "";
+  const live = block
+    .split("\n")
+    .filter((line) => !/^\s*\/\//.test(line))
+    .join("\n");
   return new Set(
-    [...block.matchAll(/([a-z0-9_]+)\s*,\s*$/gm)].map((m) => m[1] as string),
+    [...live.matchAll(/([a-z0-9_]+)\s*,\s*$/gm)].map((m) => m[1] as string),
   );
 }
 
