@@ -1,4 +1,6 @@
 # Wolf
+VERSION: 1.0
+[Still in Development and Testing Phase]
 
 A pixel-art productivity companion that lives on your desktop. Tasks, habits,
 calendar, a focus timer, and a local AI assistant — with a wolf that reacts to
@@ -149,7 +151,7 @@ what makes the IPC contract testable.
 
 ## About
 
-Wolf was built with heavy assistance from AI coding tools (OpenCode). The design, testing, and direction are maintained by the project owner.
+Wolf was built with moderately heavy assistance from AI coding tools (OpenCode). The design, testing, and direction are maintained by the project owner.
 
 ## Licence
 
